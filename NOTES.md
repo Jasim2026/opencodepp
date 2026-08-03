@@ -61,6 +61,32 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   root, else env_snapshot sees no `.git` and the git fields are empty. The
   `git_dirty` field is intentionally a *staged-proxy* heuristic (`.git/index`
   mtime vs HEAD) so the snapshot never spawns a subprocess.
+- **`Content-Length: 0` is length-framed, not EOF-framed**: `HttpParser`
+  originally treated CL:0 responses as EOF-framed, so 429/500 empty bodies
+  surfaced as premature-EOF `e_net_connect detail=1` instead of a parsed
+  response. Fix: `length_framed_` flag set whenever Content-Length is present
+  (incl. 0); `body_done()` uses `body_got_ >= content_length_` when set. Found
+  by `drill sc_rate_limit/sc_server_error`.
+- **SIGPIPE kills net test tools**: a server writing to a socket whose peer
+  already closed dies on SIGPIPE before the client can finish the scenario
+  (drill's probe connect-then-close pattern). Fix: `signal(SIGPIPE, SIG_IGN)`
+  in tool `main()`.
+- **`e_proto_parse` is deliberately non-retryable**: a garbage-bytes test must
+  assert a clean structured error + session survival, NOT a retry. Same for
+  `e_auth`. Only 429/5xx/net-* retry.
+- **mbedTLS is API-versioned 2.x vs 3.x**: `mbedtls_ssl_session_copy` does not
+  exist even in 3.6.5; the portable 2-arg `mbedtls_ssl_get_session(ctx, copy)`
+  is identical in 2.x and 3.x. CI apt ships 2.28 while local Termux has 3.6.5,
+  so any version-dependent call must be checked against BOTH (the original
+  inverted `#if >= 0x03000000` guard only built locally). Prefer the portable
+  form when one exists.
+- **Server-side accept counting races the client's `connect()`**: the accept
+  thread increments its atomic after the connect returns, so asserting
+  `accepted.load() == N` right after connecting is flaky. Fix: bounded
+  `wait_accepted()` yield loop before each assertion.
+- **`rtt_p50() > 0` is flaky on fast localhost**: an -O3 exchange can complete
+  in < 1 ms, so percentile assertions failed in release while passing in debug.
+  Assert `rtt_samples() >= 1` (count) instead of a duration inequality.
 
 ---
 

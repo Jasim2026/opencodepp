@@ -6,9 +6,13 @@
 #include <cstring>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "core/arena.h"
+#include "msg/codec.h"
+#include "msg/message.h"
+#include "msg/part.h"
 #include "util/json.h"
 
 namespace {
@@ -43,6 +47,7 @@ struct Bench {
 
 using namespace opencode::core;
 using namespace opencode::util;
+namespace core = opencode::core; /* qualified alias for the msg codec APIs */
 
 /* ---- Phase 1: arena vs malloc (acceptance gate: >= 10x on warm reuse) ---- */
 
@@ -79,6 +84,87 @@ REGISTER_BENCH(json_parse_small, {
         JVal v;
         size_t pos = 0;
         const error_code ec = parse_json(std::string_view(doc), v, &pos);
+        if (!ec.ok()) std::abort();
+    }
+})
+
+/* ---- Phase 2: binary codec vs equivalent JSON on a 500-part message ---- */
+
+struct CodecBenchData {
+    opencode::msg::Message msg;
+    std::string json;              /* equivalent JSON document */
+    std::vector<std::uint8_t> bin; /* binary encoding of msg */
+    core::Arena arena;
+
+    CodecBenchData() {
+        msg.id = "m-big";
+        msg.session_id = "s-1";
+        msg.role = opencode::msg::Role::assistant;
+        msg.model = "gpt-4o";
+        msg.created_at = 1700000000ull;
+        msg.parts.reserve(500);
+        for (int i = 0; i < 500; ++i) {
+            switch (i % 7) {
+                case 0:
+                    msg.parts.push_back(opencode::msg::Text{"repeat content"});
+                    break;
+                case 1:
+                    msg.parts.push_back(opencode::msg::Reasoning{"trace"});
+                    break;
+                case 2:
+                    msg.parts.push_back(opencode::msg::ImageUrl{"https://e.com/i.png"});
+                    break;
+                case 3:
+                    msg.parts.push_back(opencode::msg::Binary{
+                        "image/png", std::vector<std::uint8_t>(64, 0xAB)});
+                    break;
+                case 4:
+                    msg.parts.push_back(opencode::msg::ToolCall{
+                        "c1", "bash", "{\"cmd\":\"ls\"}", i % 2 == 0});
+                    break;
+                case 5:
+                    msg.parts.push_back(opencode::msg::ToolResult{"c1", "ok", false});
+                    break;
+                case 6:
+                    msg.parts.push_back(opencode::msg::Finish{
+                        opencode::msg::FinishReason::end_turn});
+                    break;
+            }
+        }
+        const std::span<std::byte> sp = opencode::msg::encode_message(msg, arena);
+        bin.assign(reinterpret_cast<const std::uint8_t*>(sp.data()),
+                   reinterpret_cast<const std::uint8_t*>(sp.data()) + sp.size());
+        json = opencode::util::to_json(opencode::msg::to_json(msg));
+    }
+};
+static const CodecBenchData kCodec; /* built once before main() */
+
+static std::span<const std::byte> bytes_of(const std::vector<std::uint8_t>& v) {
+    return {reinterpret_cast<const std::byte*>(v.data()), v.size()};
+}
+
+REGISTER_BENCH(codec_encode_500, {
+    for (int i = 0; i < 200; ++i) {
+        core::Arena a;
+        const std::span<std::byte> sp = opencode::msg::encode_message(kCodec.msg, a);
+        if (sp.empty()) std::abort();
+    }
+})
+
+REGISTER_BENCH(codec_decode_500, {
+    for (int i = 0; i < 200; ++i) {
+        opencode::msg::Message m;
+        const core::error_code ec =
+            opencode::msg::decode_message(bytes_of(kCodec.bin), m);
+        if (!ec.ok()) std::abort();
+    }
+})
+
+REGISTER_BENCH(json_parse_500eq, {
+    for (int i = 0; i < 200; ++i) {
+        JVal v;
+        size_t pos = 0;
+        const core::error_code ec = parse_json(kCodec.json, v, &pos);
         if (!ec.ok()) std::abort();
     }
 })

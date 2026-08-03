@@ -16,3 +16,6 @@ add_test(NAME probe_mock COMMAND probe --mock)
 
 add_executable(bench_prompt bench_prompt.cpp)
 target_link_libraries(bench_prompt PRIVATE opencodepp_static)
+
+add_executable(bench_graph bench_graph.cpp)
+target_link_libraries(bench_graph PRIVATE opencodepp_static)

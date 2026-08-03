@@ -186,6 +186,15 @@ FakeAcceptor start_acceptor() {
     return fa;
 }
 
+/* Wait (bounded) for the accept thread to observe `n` connections; the
+ * client's connect() completes before the server side increments `accepted`,
+ * so the check must not race the accept loop. */
+void wait_accepted(FakeAcceptor& fa, int n) {
+    const uint64_t t0 = now_mono_ms();
+    while (fa.st->accepted.load() < n && now_mono_ms() - t0 < 3000)
+        std::this_thread::yield();
+}
+
 EventLoop g_loop;
 
 Pool::Key key_for(int port, bool tls = false) {
@@ -205,6 +214,7 @@ void test_pool_reuse() {
     CHECK(pool.acquire(g_loop, key, nullptr, now_mono_ms() + 3000, t1).ok());
     CHECK(t1.connected());
     CHECK(pool.in_flight(key) == 1);
+    wait_accepted(fa, 1);
     CHECK(fa.st->accepted.load() == 1);
     const int fd1 = t1.fd();
 
@@ -240,6 +250,7 @@ void test_pool_idle_cap() {
         CHECK(pool.acquire(g_loop, key, nullptr, dl, ts[i]).ok());
     for (auto& t : ts) pool.release(std::move(t), key, true);
 
+    wait_accepted(fa, 3);
     CHECK(pool.idle_count() == 2); /* one closed by the per-host cap */
     CHECK(fa.st->accepted.load() == 3);
     pool.drop_idle();

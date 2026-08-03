@@ -36,9 +36,14 @@ set(OPENCODE_CORE_SOURCES
   provider/openai.cpp
   provider/openai_compat.cpp
   provider/resolver.cpp
+  prompt/budget.cpp
+  prompt/compiler.cpp
+  prompt/context.cpp
+  prompt/registry.cpp
   store/mem_store.cpp
   util/base64.cpp
-  util/json.cpp)
+  util/json.cpp
+  util/sha1.cpp)
 
 # Optional durable store backend: compiled and linked only when enabled.
 # sqlite3 is never imported by any other TU (04_DEPENDENCY_POLICY.md Section 3).

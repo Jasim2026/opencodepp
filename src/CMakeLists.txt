@@ -17,6 +17,7 @@ add_library(opencodepp_core OBJECT
   core/task.cpp
   msg/codec.cpp
   msg/message.cpp
+  msg/tokens.cpp
   util/base64.cpp
   util/json.cpp)
 target_include_directories(opencodepp_core PUBLIC

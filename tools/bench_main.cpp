@@ -13,6 +13,7 @@
 #include "msg/codec.h"
 #include "msg/message.h"
 #include "msg/part.h"
+#include "msg/tokens.h"
 #include "util/json.h"
 
 namespace {
@@ -166,6 +167,35 @@ REGISTER_BENCH(json_parse_500eq, {
         size_t pos = 0;
         const core::error_code ec = parse_json(kCodec.json, v, &pos);
         if (!ec.ok()) std::abort();
+    }
+})
+
+/* ---- Phase 2: token estimator ---- */
+
+REGISTER_BENCH(tokens_prose, {
+    const char* prose =
+        "The committee reviewed the proposal and approved the revised budget "
+        "allocation before the midday recess.";
+    for (int i = 0; i < 100000; ++i) {
+        volatile std::size_t t = opencode::msg::estimate_tokens(prose);
+        (void)t;
+    }
+})
+
+REGISTER_BENCH(tokens_code, {
+    const char* code =
+        "const x = foo(a, b) + bar(c, d) * 42;\n"
+        "for (i = 0; i < n; i++) total += items[i];\n";
+    for (int i = 0; i < 100000; ++i) {
+        volatile std::size_t t = opencode::msg::estimate_tokens(code);
+        (void)t;
+    }
+})
+
+REGISTER_BENCH(tokens_message_500, {
+    for (int i = 0; i < 200; ++i) {
+        volatile std::size_t t = opencode::msg::estimate_message_tokens(kCodec.msg);
+        (void)t;
     }
 })
 

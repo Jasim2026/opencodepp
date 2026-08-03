@@ -73,6 +73,7 @@ enum class Err : int {
     e_verify_fail   = 22, /* an edit failed a verification gate       */
     e_budget        = 23, /* per-task token budget exhausted          */
     e_aborted       = 24, /* loop aborted by feedback dedupe          */
+    e_overflow      = 25, /* caller-provided buffer too small         */
 
     last_,
 };
@@ -88,7 +89,8 @@ constexpr ErrCat category(Err e) noexcept {
         case Err::e_provider_err: case Err::e_model_unsup: return ErrCat::provider;
         case Err::e_invalid_cfg: case Err::e_missing_cfg:  return ErrCat::config;
         case Err::e_busy: case Err::e_cancelled: case Err::e_internal:
-        case Err::e_not_impl: case Err::e_oom:             return ErrCat::core;
+        case Err::e_not_impl: case Err::e_oom: case Err::e_overflow:
+            return ErrCat::core;
         case Err::e_tool_reject: case Err::e_tool_notfound: return ErrCat::tool;
         case Err::e_verify_fail:                           return ErrCat::verify;
         case Err::e_budget: case Err::e_aborted:           return ErrCat::agent;
@@ -111,6 +113,7 @@ constexpr Retry retry_class(Err e) noexcept {
         case Err::e_model_unsup: case Err::e_tool_reject: case Err::e_tool_notfound:
         case Err::e_proto_parse: case Err::e_verify_fail: case Err::e_budget:
         case Err::e_aborted: case Err::e_busy: case Err::e_not_impl:
+        case Err::e_overflow:
             return Retry::none;
 
         /* invariant broken: never retry, surface to host */
@@ -151,6 +154,7 @@ constexpr std::string_view err_name(Err e) noexcept {
         case Err::e_verify_fail: return "verify_failed";
         case Err::e_budget: return "budget_exhausted";
         case Err::e_aborted: return "aborted";
+        case Err::e_overflow: return "buffer_overflow";
         case Err::last_: break;
     }
     return "unknown";
@@ -172,6 +176,7 @@ constexpr opencode_status_t to_abi_status(Err e) noexcept {
         case Err::e_cancelled: case Err::e_budget: case Err::e_aborted:
             return OPENCODE_ERR_CANCELLED;
         case Err::e_internal: case Err::e_oom: return OPENCODE_ERR_FATAL;
+        case Err::e_overflow: return OPENCODE_ERR_VALIDATION;
         case Err::e_verify_fail: case Err::e_rate_limit:
         case Err::e_provider_err: case Err::last_:
             return OPENCODE_ERR_VALIDATION;
@@ -213,6 +218,21 @@ private:
 
 /* Named constructors for the common cases. */
 inline constexpr error_code ok() { return error_code(Err::ok); }
+inline constexpr error_code make_error_code(Err e, uint32_t detail = 0) {
+    return error_code(e, detail);
+}
+
+/* Policy helpers (feed the Phase 4 net policy and the Phase 10 agent loop):
+ *   is_retryable()  — the failure is transient by nature; a retry is allowed
+ *                     (the retry budget, Phase 6, decides whether it runs).
+ *   is_transient()  — same classification exposed for the offline/queue path.
+ */
+inline bool is_retryable(error_code ec) noexcept {
+    return ec.retry() == Retry::retryable;
+}
+inline bool is_transient(error_code ec) noexcept {
+    return ec.retry() == Retry::retryable;
+}
 
 } /* namespace opencode::core */
 

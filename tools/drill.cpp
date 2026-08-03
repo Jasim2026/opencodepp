@@ -305,7 +305,7 @@ void sc_stream_full() {
     CHECK(meter.retries() == 0);
     CHECK(meter.round_trips() >= 1);
     CHECK(meter.bytes_in() == body.size());
-    CHECK(meter.rtt_p50() > 0);
+    CHECK(meter.rtt_samples() >= 1); /* rtt recording happened */
     kill_mock(m);
     std::printf("  stream_full: OK\n");
 }

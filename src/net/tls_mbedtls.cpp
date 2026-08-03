@@ -174,21 +174,14 @@ public:
     core::error_code capture_session(TlsSession& out) override {
         auto* copy = new mbedtls_ssl_session;
         mbedtls_ssl_session_init(copy);
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+        /* Same signature in mbedTLS 2.x and 3.x: deep-copies the resumption
+         * session into `copy`. */
         const int rc = mbedtls_ssl_get_session(&ssl_, copy);
         if (rc != 0) {
             mbedtls_ssl_session_free(copy);
             delete copy;
             return tls_err(rc);
         }
-#else
-        const mbedtls_ssl_session* s = mbedtls_ssl_get_session(&ssl_);
-        if (s == nullptr || mbedtls_ssl_session_copy(copy, s) != 0) {
-            mbedtls_ssl_session_free(copy);
-            delete copy;
-            return tls_err(MBEDTLS_ERR_SSL_ALLOC_FAILED);
-        }
-#endif
         adopt(out, copy, [](void* p) noexcept {
             auto* ss = static_cast<mbedtls_ssl_session*>(p);
             mbedtls_ssl_session_free(ss);

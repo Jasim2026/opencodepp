@@ -13,3 +13,6 @@ add_test(NAME drill COMMAND drill)
 add_executable(probe probe.cpp)
 target_link_libraries(probe PRIVATE opencodepp_static)
 add_test(NAME probe_mock COMMAND probe --mock)
+
+add_executable(bench_prompt bench_prompt.cpp)
+target_link_libraries(bench_prompt PRIVATE opencodepp_static)

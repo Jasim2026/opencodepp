@@ -143,6 +143,27 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   ninja mtime loop): `ctest` on /sdcard fails with `permission denied` even
   though every binary links. Local verification copies each binary to `/tmp`
   and runs it there; CI (native ext4) is unaffected.
+- **`remove_file(file)` on every extract is O(total) even for fresh files**:
+  the Phase 7 index called it unconditionally, so indexing N files scanned the
+  growing syms/deps arrays N times (200 files 780 ms → 1000 files 7.4 s —
+  super-linear). Fix: skip the removal for files not yet in `files_`, and
+  tombstone by recorded range (syms/deps are append-only, so ranges never
+  drift; deps tombstones are reclaimed by lazy compaction when dead ≥ live).
+  Queries must filter tombstoned deps (`from_file.empty()`).
+- **Dup "def sym" emitted twice breaks lookup precedence**: the Go extractor
+  pushed each func into `extra` AND the defs loop appended it again, so
+  `by_name_` held two ids and `lookup`'s fast path preferred the second — a
+  call-graph query on the returned id came back empty. Any backend that
+  "defs first" must not also emit the same sym through a second path.
+- **The I/O floor of this sandbox is ~0.3–0.7 s per 1000 small-file reads**
+  (95%-full f2fs under proot; independent `open+read+close` microbench).
+  `mmap`+`fstat` in one fd is ~1.7× faster than `stat`+`fread` and removes the
+  per-block read syscalls. When a benchmark can't hit its time budget locally,
+  first measure the read path in isolation before blaming the algorithm;
+  index compute for 1k files is ~0.2 s.
+- **`/dev/shm` is a bind of the root fs under proot, not a real tmpfs** — the
+  `bench_graph` tmpfs fallback is still worth keeping for real Linux (CI)
+  where /dev/shm is tmpfs and reads are near-free.
 
 ---
 

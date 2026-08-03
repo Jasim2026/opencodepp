@@ -9,8 +9,11 @@
  */
 #include "graph/index.h"
 
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <algorithm>
-#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -18,18 +21,47 @@ namespace opencode::graph {
 
 namespace {
 
+/* Raw read (no stdio buffering) so per-file indexing cost is dominated by the
+ * extractor, not libc. Returns false when the file cannot be opened. */
 bool read_file_text(const std::string& path, std::string& out) {
-    FILE* f = std::fopen(path.c_str(), "rb");
-    if (f == nullptr) return false;
+    const int fd = ::open(path.c_str(), O_RDONLY);
+    if (fd < 0) return false;
     out.clear();
     char buf[8192];
-    size_t n;
-    while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) out.append(buf, n);
-    std::fclose(f);
+    ssize_t n;
+    while ((n = ::read(fd, buf, sizeof buf)) > 0) out.append(buf, static_cast<size_t>(n));
+    ::close(fd);
     return true;
 }
 
 } /* namespace */
+
+/* Open once: fstat (mtime+size fingerprint) + read in a single fd lifetime.
+ * Shared with lazy.cpp's ensure_indexed. */
+bool read_file_stat(const std::string& path, std::string& out,
+                    std::uint64_t& mtime, std::uint64_t& size) {
+    const int fd = ::open(path.c_str(), O_RDONLY);
+    if (fd < 0) return false;
+    struct ::stat st;
+    if (::fstat(fd, &st) != 0) {
+        ::close(fd);
+        return false;
+    }
+#ifdef __APPLE__
+    mtime = static_cast<std::uint64_t>(st.st_mtimespec.tv_sec) * 1000000000ULL +
+            static_cast<std::uint64_t>(st.st_mtimespec.tv_nsec);
+#else
+    mtime = static_cast<std::uint64_t>(st.st_mtim.tv_sec) * 1000000000ULL +
+            static_cast<std::uint64_t>(st.st_mtim.tv_nsec);
+#endif
+    size = static_cast<std::uint64_t>(st.st_size);
+    out.clear();
+    char buf[8192];
+    ssize_t n;
+    while ((n = ::read(fd, buf, sizeof buf)) > 0) out.append(buf, static_cast<size_t>(n));
+    ::close(fd);
+    return true;
+}
 
 Lang SymbolIndex::detect_lang(std::string_view file) const noexcept {
     const size_t dot = file.rfind('.');
@@ -50,17 +82,40 @@ core::error_code SymbolIndex::extract_file(const std::string& file) {
     std::string text;
     if (!read_file_text(file, text))
         return core::make_error_code(core::Err::e_missing_cfg);
+    return index_text(file, lang, text);
+}
+
+/* Parse already-read `text` (shared by extract_file and ensure_indexed, so a
+ * re-parse never reads the file twice). */
+core::error_code SymbolIndex::index_text(const std::string& file, Lang lang,
+                                         const std::string& text) {
     std::vector<Sym> syms;
     std::vector<Dep> deps;
     core::error_code ec = extract_lang(lang, file, text, syms, deps);
     if (!ec.ok()) return ec;
-    remove_file(file);
+    /* Only a re-parse needs the old entry removed; a fresh file has no syms or
+     * deps to drop, and skipping the removal keeps the (append-only) arrays
+     * from being scanned on every first-time parse. */
+    if (files_.find(file) != files_.end()) remove_file(file);
     return extract_into(*this, file, lang, text, syms, deps);
 }
 
+/* Tombstone the file's syms and deps in place (syms_/deps_ are append-only, so
+ * the recorded ranges stay valid across removals). O(entries of `file`), not
+ * O(total): the per-parse and LRU-eviction paths never scan the full arrays.
+ * deps_ keeps tombstones so range offsets don't drift; maybe_compact_deps()
+ * reclaims them when they dominate. */
 void SymbolIndex::remove_file(const std::string& file) noexcept {
-    for (Sym& s : syms_) {
-        if (s.file != file) continue;
+    const auto fit = files_.find(file);
+    if (fit == files_.end()) return;
+    const ParsedFile& pf = fit->second;
+
+    const std::uint32_t s_last =
+        std::min<std::uint32_t>(pf.sym_first + pf.sym_count,
+                                static_cast<std::uint32_t>(syms_.size()));
+    for (std::uint32_t i = pf.sym_first; i < s_last; ++i) {
+        Sym& s = syms_[static_cast<size_t>(i)];
+        if (s.id == 0) continue;
         auto it = by_name_.find(s.name);
         if (it != by_name_.end()) {
             std::vector<SymId>& vec = it->second;
@@ -76,12 +131,60 @@ void SymbolIndex::remove_file(const std::string& file) noexcept {
         s.lang = Lang::unknown;
         s.vis = Visibility::unknown;
     }
-    auto dit = std::remove_if(deps_.begin(), deps_.end(),
-                              [&file](const Dep& d) { return d.from_file == file; });
-    deps_.erase(dit, deps_.end());
-    files_.erase(file);
+
+    const std::uint32_t d_last =
+        std::min<std::uint32_t>(pf.dep_first + pf.dep_count,
+                                static_cast<std::uint32_t>(deps_.size()));
+    for (std::uint32_t i = pf.dep_first; i < d_last; ++i) {
+        Dep& d = deps_[static_cast<size_t>(i)];
+        d.from_sym = 0;
+        d.to_sym = 0;
+        d.kind = DepKind::call;
+        d.from_file.clear();
+        d.to_file.clear();
+        d.to_name.clear();
+    }
+
+    files_.erase(fit);
     touch_.erase(file);
     ++version_;
+
+    maybe_compact_deps();
+}
+
+/* Reclaim tombstoned deps once they dominate (amortized O(n)); rebuild the
+ * per-file dep ranges from the compacted array (deps stay contiguous per file). */
+void SymbolIndex::maybe_compact_deps() noexcept {
+    const size_t total = deps_.size();
+    if (total < 8192) return;
+    size_t dead = 0;
+    for (const Dep& d : deps_)
+        if (d.from_file.empty()) ++dead;
+    if (dead * 2 < total) return;
+
+    deps_.erase(std::remove_if(deps_.begin(), deps_.end(),
+                               [](const Dep& d) { return d.from_file.empty(); }),
+                deps_.end());
+
+    std::string cur;
+    std::uint32_t run_start = 0;
+    auto close_run = [&](std::uint32_t end) {
+        if (cur.empty()) return;
+        auto it = files_.find(cur);
+        if (it != files_.end()) {
+            it->second.dep_first = run_start;
+            it->second.dep_count = end - run_start;
+        }
+    };
+    for (size_t i = 0; i < deps_.size(); ++i) {
+        const std::string& f = deps_[i].from_file;
+        if (f != cur) {
+            close_run(static_cast<std::uint32_t>(i));
+            cur = f;
+            run_start = static_cast<std::uint32_t>(i);
+        }
+    }
+    close_run(static_cast<std::uint32_t>(deps_.size()));
 }
 
 /* Assign SymIds, register names, resolve same-file to_sym, append. Called from

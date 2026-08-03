@@ -255,12 +255,18 @@ void test_lru_eviction() {
     Sym gone;
     CHECK(!idx.lookup("apply", ws("math.c"), gone).ok());
 
+    /* evicted file's deps are tombstoned: no stale callers survive */
+    CHECK(idx.callers_of_name("add").empty());
+
     /* re-indexing evicted file re-parses */
     const std::uint32_t e0 = idx.extract_count();
     CHECK(idx.ensure_indexed(ws("math.c")).ok());
     CHECK(idx.extract_count() == e0 + 1);
     CHECK(idx.lookup("apply", ws("math.c"), gone).ok());
     CHECK(gone.kind == SymKind::function);
+    Sym twice_again;
+    CHECK(idx.lookup("twice", ws("math.c"), twice_again).ok());
+    CHECK(has_id(idx.callers_of_name("add"), twice_again.id)); /* twice calls add */
 
     /* eviction is LRU: util.cpp (now oldest) dropped, main.go survives */
     Sym point;

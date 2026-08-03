@@ -122,8 +122,7 @@ public:
      * file cannot be read). */
     core::error_code extract_file(const std::string& file);
 
-    /* ---- queries ---- */
-    core::error_code lookup(std::string_view qname, std::string_view file_hint,
+    /* ---- queries ---- */    core::error_code lookup(std::string_view qname, std::string_view file_hint,
                             Sym& out) const noexcept;
     std::vector<Sym> all(SymKind kind, std::string_view prefix,
                          std::uint32_t limit) const noexcept;
@@ -165,8 +164,11 @@ private:
                                          std::vector<Sym>&, std::vector<Dep>&);
 
     SymId next_id() noexcept { return static_cast<SymId>(syms_.size()) + 1; }
+    core::error_code index_text(const std::string& file, Lang lang,
+                                const std::string& text);
     void remove_file(const std::string& file) noexcept;
     void evict_lru() noexcept;
+    void maybe_compact_deps() noexcept;
 
     IndexLimits limits_;
     std::vector<Sym> syms_;
@@ -184,6 +186,11 @@ private:
 core::error_code extract_lang(Lang lang, const std::string& file,
                               const std::string& src, std::vector<Sym>& syms,
                               std::vector<Dep>& deps) noexcept;
+
+/* Open `path` once: fstat the (mtime,size) fingerprint and read the whole
+ * file (index.cpp). Used by ensure_indexed so a re-parse never reads twice. */
+bool read_file_stat(const std::string& path, std::string& out,
+                    std::uint64_t& mtime, std::uint64_t& size);
 
 } /* namespace opencode::graph */
 

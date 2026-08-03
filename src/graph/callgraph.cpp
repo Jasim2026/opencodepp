@@ -32,6 +32,7 @@ void append_unique_id(std::vector<SymId>& v, SymId id) {
 std::vector<std::string> SymbolIndex::callees(SymId id) const noexcept {
     std::vector<std::string> out;
     for (const Dep& d : deps_) {
+        if (d.from_file.empty()) continue; /* tombstoned by removal */
         if (d.from_sym == id && d.kind == DepKind::call)
             append_unique(out, d.to_name);
     }
@@ -41,6 +42,7 @@ std::vector<std::string> SymbolIndex::callees(SymId id) const noexcept {
 std::vector<SymId> SymbolIndex::callers_of(SymId id) const noexcept {
     std::vector<SymId> out;
     for (const Dep& d : deps_) {
+        if (d.from_file.empty()) continue; /* tombstoned by removal */
         if (d.to_sym == id && d.kind == DepKind::call && d.from_sym != 0)
             append_unique_id(out, d.from_sym);
     }
@@ -50,6 +52,7 @@ std::vector<SymId> SymbolIndex::callers_of(SymId id) const noexcept {
 std::vector<SymId> SymbolIndex::callers_of_name(std::string_view name) const noexcept {
     std::vector<SymId> out;
     for (const Dep& d : deps_) {
+        if (d.from_file.empty()) continue; /* tombstoned by removal */
         if (d.kind == DepKind::call && d.from_sym != 0 &&
             d.to_name == name)
             append_unique_id(out, d.from_sym);

@@ -41,6 +41,15 @@
       }
     },
     {
+      "name": "sqlite",
+      "inherits": "dev",
+      "displayName": "Dev + SQLite backend",
+      "description": "Dev (ASan/UBSan, -Werror) plus the optional sqlite store",
+      "cacheVariables": {
+        "OPENCODE_USE_SQLITE": "ON"
+      }
+    },
+    {
       "name": "size",
       "inherits": "base",
       "displayName": "Size (-Os, stripped)",
@@ -71,6 +80,7 @@
     { "name": "dev", "configurePreset": "dev" },
     { "name": "release", "configurePreset": "release" },
     { "name": "size", "configurePreset": "size" },
+    { "name": "sqlite", "configurePreset": "sqlite" },
     { "name": "android", "configurePreset": "android" }
   ],
   "testPresets": [
@@ -87,6 +97,11 @@
     {
       "name": "size",
       "configurePreset": "size",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "sqlite",
+      "configurePreset": "sqlite",
       "output": { "outputOnFailure": true }
     },
     {

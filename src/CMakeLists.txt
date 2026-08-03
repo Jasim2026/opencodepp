@@ -24,7 +24,16 @@ set(OPENCODE_CORE_SOURCES
   util/base64.cpp
   util/json.cpp)
 
+# Optional durable store backend: compiled and linked only when enabled.
+# sqlite3 is never imported by any other TU (04_DEPENDENCY_POLICY.md Section 3).
+if(OPENCODE_USE_SQLITE)
+  list(APPEND OPENCODE_CORE_SOURCES store/sqlite_store.cpp)
+endif()
+
 add_library(opencodepp_core OBJECT ${OPENCODE_CORE_SOURCES})
+if(OPENCODE_USE_SQLITE)
+  target_link_libraries(opencodepp_core PUBLIC sqlite3)
+endif()
 target_include_directories(opencodepp_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>

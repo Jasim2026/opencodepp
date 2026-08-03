@@ -1,0 +1,17 @@
+{
+  "name": "edge-fix-typo",
+  "system_ids": ["SYSTEM_BASE"],
+  "target_tokens": 3500,
+  "recent_assistant_turns": 2,
+  "messages": [
+    {"id": "m1", "role": "user", "text": "Fix the typo in src/main.c."},
+    {"id": "m2", "role": "assistant", "text": "Let me read src/main.c."}
+  ],
+  "required_contains": [
+    "OUTPUT CONTRACT",
+    "Fix the typo in src/main.c.",
+    "Let me read src/main.c."
+  ],
+  "expect_under_target": true,
+  "min_omissions": 0
+}

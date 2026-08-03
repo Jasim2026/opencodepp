@@ -361,6 +361,109 @@ void test_budget() {
     std::printf("  budget: OK\n");
 }
 
+/* ---- golden prompt corpus (tests/fixtures/prompts) ---- */
+
+Role role_from(std::string_view s) noexcept {
+    if (s == "assistant") return Role::assistant;
+    if (s == "system") return Role::system;
+    return Role::user;
+}
+
+/* Run one corpus fixture through assemble_context and assert its contract:
+ * determinism, token budget, required-part presence, and cut accounting. */
+void run_fixture(const std::string& path, const PromptRegistry& reg) {
+    const std::string raw = read_file(path.c_str());
+    JVal doc;
+    CHECK(parse_json(raw, doc).ok());
+    const std::string name =
+        doc.find("name") ? std::string(doc.find("name")->str) : path;
+
+    MsgList hist;
+    const JVal* msgs = doc.find("messages");
+    CHECK(msgs != nullptr);
+    if (msgs == nullptr) return;
+    for (const JVal& m : msgs->arr) {
+        Message msg;
+        msg.id = m.find("id") ? std::string(m.find("id")->str) : "";
+        msg.role = role_from(m.find("role")->str);
+        add_part(msg, Text{std::string(m.find("text")->str)});
+        hist.push_back(std::move(msg));
+    }
+
+    ToolsSpec tools;
+    if (const JVal* t = doc.find("tool")) {
+        ToolSpec ts;
+        ts.id = std::string(t->find("id")->str);
+        ts.name = std::string(t->find("name")->str);
+        ts.description = std::string(t->find("description")->str);
+        ts.input_schema_json = std::string(t->find("input_schema")->str);
+        tools.push_back(std::move(ts));
+    }
+
+    ContextInput in;
+    in.registry = &reg;
+    in.messages = &hist;
+    if (!tools.empty()) in.tools = &tools;
+    if (const JVal* ids = doc.find("system_ids"))
+        for (const JVal& id : ids->arr) in.system_ids.push_back(std::string(id.str));
+    if (const JVal* v = doc.find("target_tokens")) in.target_tokens = (uint32_t)v->num;
+    if (const JVal* v = doc.find("available_tokens")) in.available_tokens = (uint32_t)v->num;
+    if (const JVal* v = doc.find("recent_assistant_turns"))
+        in.recent_assistant_turns = (uint32_t)v->num;
+
+    ContextPlan a, b;
+    CHECK(assemble_context(in, a).ok());
+    CHECK(assemble_context(in, b).ok());
+
+    /* deterministic */
+    CHECK(a.estimated_tokens == b.estimated_tokens);
+    CHECK(a.bytes == b.bytes);
+    CHECK(a.messages.size() == b.messages.size());
+    for (size_t i = 0; i < a.messages.size(); ++i)
+        CHECK(a.messages[i].content_text() == b.messages[i].content_text());
+
+    /* required parts present (100% locally; plan gate is >= 95%) */
+    if (const JVal* req = doc.find("required_contains")) {
+        std::string joined;
+        for (const Message& m : a.messages) joined += m.content_text();
+        for (const JVal& r : req->arr)
+            CHECK(joined.find(r.str) != std::string::npos);
+    }
+
+    /* budget assertions */
+    if (const JVal* v = doc.find("expect_under_target"))
+        CHECK(a.under_target == (v->b != 0));
+    if (const JVal* v = doc.find("expect_tool_tokens_gt"))
+        CHECK(a.tool_tokens > (uint32_t)v->num);
+
+    /* every cut logged */
+    const size_t cuts = a.events.size();
+    if (const JVal* v = doc.find("min_omissions")) {
+        size_t omits = 0;
+        for (const ContextEvent& e : a.events)
+            if (e.kind == ContextEvent::Kind::omitted) ++omits;
+        CHECK(omits >= (size_t)v->num);
+    }
+    if (const JVal* v = doc.find("expect_omissions")) {
+        const bool any = !a.omitted.empty();
+        CHECK(any == (v->b != 0));
+    }
+    CHECK(cuts == a.omitted.size() + a.truncated.size());
+
+    std::printf("  corpus %-22s tokens=%u bytes=%zu events=%zu under=%d\n",
+                name.c_str(), a.estimated_tokens, a.bytes, cuts,
+                a.under_target ? 1 : 0);
+}
+
+void test_corpus() {
+    PromptRegistry reg;
+    CHECK(load_templates("src/prompt/templates", reg).ok());
+    run_fixture("tests/fixtures/prompts/edge_fix.json", reg);
+    run_fixture("tests/fixtures/prompts/code_refactor.json", reg);
+    run_fixture("tests/fixtures/prompts/big_history_trim.json", reg);
+    std::printf("  corpus: OK\n");
+}
+
 } /* namespace */
 
 int main() {
@@ -370,6 +473,7 @@ int main() {
     test_tools_schema();
     test_context();
     test_budget();
+    test_corpus();
     if (failures == 0) {
         std::printf("prompt_test: OK\n");
         return EXIT_SUCCESS;

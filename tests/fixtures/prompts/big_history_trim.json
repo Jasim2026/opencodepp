@@ -1,0 +1,83 @@
+{
+  "name": "big-history-trim",
+  "system_ids": [
+    "SYSTEM_BASE"
+  ],
+  "target_tokens": 3500,
+  "available_tokens": 900,
+  "recent_assistant_turns": 2,
+  "messages": [
+    {
+      "id": "f0",
+      "role": "assistant",
+      "text": "Historical filler about the arena allocator and its slab partitioning strategy, the free-list discipline, and the alignment guarantees for zero-copy message buffers from an older turn. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the arena allocator and its slab partitioning strategy, the free-list discipline, and the alignment guarantees for zero-copy message buffers from an older turn. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the arena allocator and its slab partitioning strategy, the free-list discipline, and the alignment guarantees for zero-copy message buffers from an older turn. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f1",
+      "role": "user",
+      "text": "Historical filler about the message codec binary format, the varint field encoding, the fixed-size header block, and how part payloads are framed into the storage and wire layouts. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the message codec binary format, the varint field encoding, the fixed-size header block, and how part payloads are framed into the storage and wire layouts. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the message codec binary format, the varint field encoding, the fixed-size header block, and how part payloads are framed into the storage and wire layouts. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f2",
+      "role": "assistant",
+      "text": "Historical filler about the network pool connection reuse policy, per-connection timeouts, the graceful shutdown path, and the TLS session resumption behavior when a peer resets a stream. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the network pool connection reuse policy, per-connection timeouts, the graceful shutdown path, and the TLS session resumption behavior when a peer resets a stream. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the network pool connection reuse policy, per-connection timeouts, the graceful shutdown path, and the TLS session resumption behavior when a peer resets a stream. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f3",
+      "role": "user",
+      "text": "Historical filler about the provider layer event vocabulary, the normalized stream events, and the mapping of wire errors onto the shared error taxonomy used by the agent loop. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the provider layer event vocabulary, the normalized stream events, and the mapping of wire errors onto the shared error taxonomy used by the agent loop. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the provider layer event vocabulary, the normalized stream events, and the mapping of wire errors onto the shared error taxonomy used by the agent loop. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f4",
+      "role": "assistant",
+      "text": "Historical filler about the configuration schema versioning rules, forward-compatibility guarantees, and the migration path for older config files that predate the current release. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the configuration schema versioning rules, forward-compatibility guarantees, and the migration path for older config files that predate the current release. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the configuration schema versioning rules, forward-compatibility guarantees, and the migration path for older config files that predate the current release. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f5",
+      "role": "user",
+      "text": "Historical filler about the store backend selection logic, the in-memory default, the optional sqlite backend, and the durability tradeoffs each backend makes for session persistence. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the store backend selection logic, the in-memory default, the optional sqlite backend, and the durability tradeoffs each backend makes for session persistence. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the store backend selection logic, the in-memory default, the optional sqlite backend, and the durability tradeoffs each backend makes for session persistence. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f6",
+      "role": "assistant",
+      "text": "Historical filler about the verification gates, the pre-apply syntax checks, the symbol resolution pass, and the retry budget that bounds how many corrective attempts may run. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the verification gates, the pre-apply syntax checks, the symbol resolution pass, and the retry budget that bounds how many corrective attempts may run. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the verification gates, the pre-apply syntax checks, the symbol resolution pass, and the retry budget that bounds how many corrective attempts may run. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f7",
+      "role": "user",
+      "text": "Historical filler about the offline queue drain order, the deterministic backoff schedule, and the resumption semantics when connectivity is restored after an extended outage. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the offline queue drain order, the deterministic backoff schedule, and the resumption semantics when connectivity is restored after an extended outage. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about the offline queue drain order, the deterministic backoff schedule, and the resumption semantics when connectivity is restored after an extended outage. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f8",
+      "role": "assistant",
+      "text": "Historical filler about more historical filler about subsystem 8 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about more historical filler about subsystem 8 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about more historical filler about subsystem 8 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "f9",
+      "role": "assistant",
+      "text": "Historical filler about more historical filler about subsystem 9 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about more historical filler about subsystem 9 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session. Historical filler about more historical filler about subsystem 9 that is now obsolete and only kept around to make the fixture heavy. This repeats for length so that the message carries a realistic token weight in a real session."
+    },
+    {
+      "id": "m1",
+      "role": "user",
+      "text": "Now let us focus on the actual task."
+    },
+    {
+      "id": "m2",
+      "role": "assistant",
+      "text": "Understood, I will investigate the current implementation."
+    },
+    {
+      "id": "m3",
+      "role": "user",
+      "text": "This is the live request that must survive trimming: apply the change."
+    }
+  ],
+  "required_contains": [
+    "OUTPUT CONTRACT",
+    "This is the live request that must survive trimming: apply the change."
+  ],
+  "expect_omissions": true,
+  "expect_under_target": true,
+  "min_omissions": 1
+}

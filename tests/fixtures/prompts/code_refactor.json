@@ -1,0 +1,23 @@
+{
+  "name": "code-refactor-with-tools",
+  "system_ids": ["SYSTEM_BASE"],
+  "target_tokens": 3500,
+  "recent_assistant_turns": 2,
+  "tool": {
+    "id": "read_file",
+    "name": "read_file",
+    "description": "Read a file from the workspace",
+    "input_schema": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}}}"
+  },
+  "messages": [
+    {"id": "m1", "role": "user", "text": "Refactor the event loop into its own module."},
+    {"id": "m2", "role": "assistant", "text": "I will inspect core/event_loop.cpp first."}
+  ],
+  "required_contains": [
+    "Refactor the event loop into its own module.",
+    "I will inspect core/event_loop.cpp first."
+  ],
+  "expect_tool_tokens_gt": 0,
+  "expect_under_target": true,
+  "min_omissions": 0
+}

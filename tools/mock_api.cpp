@@ -82,22 +82,22 @@ int make_listener(uint16_t port, bool loopback_only) {
     return fd;
 }
 
-/* Read until the end of headers ("\r\n\r\n"); body is discarded. */
-void read_request(int fd) {
+/* Read the request line + headers ("\r\n\r\n"); body is discarded.
+ * Returns the first line (e.g. "GET /health HTTP/1.1") or "" on error. */
+std::string read_request(int fd) {
+    std::string raw;
     char buf[1024];
     size_t keep = 0;
     while (true) {
         ssize_t n = ::read(fd, buf, sizeof buf);
-        if (n <= 0) return;
+        if (n <= 0) break;
+        raw.append(buf, static_cast<size_t>(n));
         keep += static_cast<size_t>(n);
-        /* a trailing-scan is enough for a mock: look for the header terminator */
-        for (ssize_t i = 0; i + 3 < n; ++i) {
-            if (buf[i] == '\r' && buf[i + 1] == '\n' && buf[i + 2] == '\r' &&
-                buf[i + 3] == '\n')
-                return;
-        }
-        if (keep > 1u << 20) return; /* runaway request: give up */
+        if (raw.find("\r\n\r\n") != std::string::npos) break;
+        if (keep > 1u << 20) break; /* runaway request: give up */
     }
+    size_t eol = raw.find("\r\n");
+    return raw.substr(0, eol);
 }
 
 void send_all(int fd, const char* data, size_t n) {
@@ -128,12 +128,35 @@ void respond(int fd, int status, const char* status_text, const char* content_ty
     send_all(fd, body.data(), body.size());
 }
 
+/* Route by method + path.
+ *   GET  /health -> 200 text/plain "ok\n"
+ *   POST /v1/chat -> 200 text/event-stream (scripted SSE)
+ * Anything else -> 404. Phase 4 upgrades this to fault scenarios. */
 void handle(int fd, const std::string& script, bool verbose) {
-    read_request(fd);
-    /* Phase 0: we don't parse the request line; every POST gets the script.
-       Phase 4 upgrades this to real routing + fault scenarios. */
-    respond(fd, 200, "OK", "text/event-stream", script);
-    if (verbose) std::fprintf(stderr, "mock_api: served %zu-byte SSE script\n", script.size());
+    const std::string reqline = read_request(fd);
+    std::string method = "GET", path = "/";
+    {
+        size_t sp1 = reqline.find(' ');
+        size_t sp2 = reqline.find(' ', sp1 + 1);
+        if (sp1 != std::string::npos && sp2 != std::string::npos) {
+            method = reqline.substr(0, sp1);
+            path = reqline.substr(sp1 + 1, sp2 - sp1 - 1);
+        }
+    }
+
+    if (method == "GET" && path == "/health") {
+        respond(fd, 200, "OK", "text/plain", "ok\n");
+        return;
+    }
+    if (method == "POST" && path == "/v1/chat") {
+        respond(fd, 200, "OK", "text/event-stream", script);
+        if (verbose)
+            std::fprintf(stderr, "mock_api: served %zu-byte SSE script\n",
+                         script.size());
+        return;
+    }
+    respond(fd, 404, "Not Found", "text/plain", "not found\n");
+    if (verbose) std::fprintf(stderr, "mock_api: 404 %s %s\n", method.c_str(), path.c_str());
 }
 
 void usage(const char* argv0) {

@@ -82,8 +82,8 @@ jobs:
           trap "kill $MOCK_PID 2>/dev/null || true" EXIT
           sleep 1
           curl -fsS http://127.0.0.1:8123/health | grep -qx ok
-          # SSE chat: stream 3 data events then a done event
-          OUT="$(curl -fsSN --max-time 10 http://127.0.0.1:8123/v1/chat)"
+          # SSE chat: stream 3 data events then a done event (POST endpoint)
+          OUT="$(curl -fsSN -X POST --max-time 10 http://127.0.0.1:8123/v1/chat)"
           echo "$OUT"
           echo "$OUT" | grep -q '"type":"text"'
           echo "$OUT" | grep -q '"finish_reason":"stop"'

@@ -31,9 +31,6 @@ if(OPENCODE_USE_SQLITE)
 endif()
 
 add_library(opencodepp_core OBJECT ${OPENCODE_CORE_SOURCES})
-if(OPENCODE_USE_SQLITE)
-  target_link_libraries(opencodepp_core PUBLIC sqlite3)
-endif()
 target_include_directories(opencodepp_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
@@ -42,6 +39,13 @@ target_include_directories(opencodepp_core PUBLIC
 add_library(opencodepp_static STATIC $<TARGET_OBJECTS:opencodepp_core>)
 add_library(opencodepp_shared SHARED $<TARGET_OBJECTS:opencodepp_core>)
 set_target_properties(opencodepp_shared PROPERTIES OUTPUT_NAME opencodepp)
+
+# The static/shared libs use $<TARGET_OBJECTS>, so the object lib's link usage
+# requirements do NOT propagate; link the optional backend explicitly here.
+if(OPENCODE_USE_SQLITE)
+  target_link_libraries(opencodepp_static PUBLIC sqlite3)
+  target_link_libraries(opencodepp_shared PUBLIC sqlite3)
+endif()
 
 foreach(tgt opencodepp_static opencodepp_shared)
   target_include_directories(${tgt} PUBLIC

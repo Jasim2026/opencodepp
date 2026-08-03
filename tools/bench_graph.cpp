@@ -62,7 +62,11 @@ int main(int argc, char** argv) {
     const int kFns = 12;
     const int kCalls = 4;
 
-    const std::string dir = "/tmp/opencode/graph_bench";
+    /* Corpus on tmpfs when available so the timing measures indexing compute,
+     * not filesystem I/O (a repo on a slow/nearly-full disk would hide it). */
+    const std::string dir = std::system("test -d /dev/shm && test -w /dev/shm") == 0
+                                ? "/dev/shm/graph_bench"
+                                : "/tmp/opencode/graph_bench";
     const int r_clean = std::system(("rm -rf " + dir).c_str());
     (void)r_clean;
     const int r1 = std::system(("mkdir -p " + dir).c_str());

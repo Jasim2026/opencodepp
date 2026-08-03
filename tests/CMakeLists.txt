@@ -22,11 +22,16 @@ foreach(test
     net_socket_test
     net_http_test
     net_pool_test
-    net_meter_offline_test)
+    net_meter_offline_test
+    provider_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
 endforeach()
+
+# provider_test reads its golden wire fixtures from the source tree.
+set_tests_properties(provider_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # tokens_test loads its labeled corpus from the source tree.
 set_tests_properties(tokens_test PROPERTIES

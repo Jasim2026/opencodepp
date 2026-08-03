@@ -9,3 +9,7 @@ target_link_libraries(mock_api PRIVATE opencodepp_static)
 add_executable(drill drill.cpp)
 target_link_libraries(drill PRIVATE opencodepp_static)
 add_test(NAME drill COMMAND drill)
+
+add_executable(probe probe.cpp)
+target_link_libraries(probe PRIVATE opencodepp_static)
+add_test(NAME probe_mock COMMAND probe --mock)

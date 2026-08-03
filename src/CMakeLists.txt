@@ -30,6 +30,12 @@ set(OPENCODE_CORE_SOURCES
   net/tls.cpp
   net/tls_host.cpp
   net/transport.cpp
+  provider/anthropic.cpp
+  provider/factory.cpp
+  provider/gemini.cpp
+  provider/openai.cpp
+  provider/openai_compat.cpp
+  provider/resolver.cpp
   store/mem_store.cpp
   util/base64.cpp
   util/json.cpp)

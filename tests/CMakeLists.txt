@@ -17,7 +17,8 @@ foreach(test
     codec_test
     tokens_test
     config_test
-    model_test)
+    model_test
+    store_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
@@ -30,3 +31,7 @@ set_tests_properties(tokens_test PROPERTIES
 # config_test probes the environment (git detection) from inside the repo.
 set_tests_properties(config_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+# store_test runs the sqlite suite only when the optional backend is built.
+target_compile_definitions(store_test PRIVATE
+  OPENCODE_USE_SQLITE=$<BOOL:${OPENCODE_USE_SQLITE}>)

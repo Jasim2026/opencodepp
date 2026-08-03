@@ -20,6 +20,7 @@ set(OPENCODE_CORE_SOURCES
   msg/codec.cpp
   msg/message.cpp
   msg/tokens.cpp
+  store/mem_store.cpp
   util/base64.cpp
   util/json.cpp)
 

@@ -7,8 +7,10 @@
 # opencodepp_static : static lib (embeddable; the default for hosts).
 # opencodepp_shared : shared lib (dlopen-friendly; carries exported ABI symbol).
 
-add_library(opencodepp_core OBJECT
+set(OPENCODE_CORE_SOURCES
   abi/version.cpp
+  config/config.cpp
+  config/env_snapshot.cpp
   core/arena.cpp
   core/event_loop.cpp
   core/log.cpp
@@ -20,6 +22,8 @@ add_library(opencodepp_core OBJECT
   msg/tokens.cpp
   util/base64.cpp
   util/json.cpp)
+
+add_library(opencodepp_core OBJECT ${OPENCODE_CORE_SOURCES})
 target_include_directories(opencodepp_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>

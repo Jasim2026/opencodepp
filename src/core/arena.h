@@ -65,6 +65,7 @@ private:
     };
     Block* head_ = nullptr; /* most recently grown block */
     Block* tail_ = nullptr; /* oldest block (first in list) */
+    Block* cur_ = nullptr;  /* block being bumped into (fill cursor) */
     size_t next_cap_;
     size_t used_ = 0;
     size_t total_ = 0; /* bytes actually malloc'd (headers + data) */

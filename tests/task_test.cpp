@@ -50,21 +50,26 @@ void test_ping_pong() {
         for (int i = 0; i < 3; ++i) {
             co_await io::await_readable(sv[0]);
             char c;
-            (void)::read(sv[0], &c, 1);
+            const ssize_t nr = ::read(sv[0], &c, 1);
+            (void)nr;
             ++acount;
-            (void)::write(sv[0], "a", 1); /* reply makes sv[1] readable */
+            const ssize_t nw = ::write(sv[0], "a", 1);
+            (void)nw;
         }
     };
     auto b = [&]() -> co_task {
         for (int i = 0; i < 3; ++i) {
             co_await io::await_readable(sv[1]);
             char c;
-            (void)::read(sv[1], &c, 1);
+            const ssize_t nr = ::read(sv[1], &c, 1);
+            (void)nr;
             ++bcount;
-            (void)::write(sv[1], "b", 1); /* reply makes sv[0] readable */
+            const ssize_t nw = ::write(sv[1], "b", 1);
+            (void)nw;
         }
     };
-    (void)::write(sv[1], "s", 1); /* seed */
+    const ssize_t seed = ::write(sv[1], "s", 1); /* seed makes sv[0] readable */
+    (void)seed;
     sched.spawn(a());
     sched.spawn(b());
     int guard = 0;

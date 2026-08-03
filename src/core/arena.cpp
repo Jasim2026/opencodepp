@@ -10,12 +10,14 @@ Arena::Arena(size_t first_chunk) noexcept : next_cap_(first_chunk) {}
 Arena::Arena(Arena&& o) noexcept
     : head_(o.head_),
       tail_(o.tail_),
+      cur_(o.cur_),
       next_cap_(o.next_cap_),
       used_(o.used_),
       total_(o.total_),
       nblocks_(o.nblocks_) {
     o.head_ = nullptr;
     o.tail_ = nullptr;
+    o.cur_ = nullptr;
     o.next_cap_ = Arena::kDefaultChunk;
     o.used_ = o.total_ = o.nblocks_ = 0;
 }
@@ -25,12 +27,14 @@ Arena& Arena::operator=(Arena&& o) noexcept {
         clear();
         head_ = o.head_;
         tail_ = o.tail_;
+        cur_ = o.cur_;
         next_cap_ = o.next_cap_;
         used_ = o.used_;
         total_ = o.total_;
         nblocks_ = o.nblocks_;
         o.head_ = nullptr;
         o.tail_ = nullptr;
+        o.cur_ = nullptr;
         o.used_ = o.total_ = o.nblocks_ = 0;
     }
     return *this;
@@ -60,6 +64,7 @@ Arena::Block* Arena::grow(size_t need) noexcept {
     if (head_ != nullptr) head_->newer = b;
     head_ = b;
     if (tail_ == nullptr) tail_ = b;
+    cur_ = b;
     ++nblocks_;
     total_ += header + cap + Arena::kAlign - 1;
     return b;
@@ -70,14 +75,17 @@ void* Arena::alloc(size_t n, size_t align) noexcept {
     if (align > kAlign) align = kAlign;
     if (n == 0) n = 1;
 
-    /* Scan oldest -> newest so a reset workload reuses existing blocks before
-     * growing (steady-state zero-churn after warmup). */
-    for (Block* b = tail_; b != nullptr; b = b->newer) {
+    /* Fast path: bump in the current fill block (O(1)). After reset the
+     * cursor starts at the newest (largest) block, so a reset workload
+     * reuses every existing block before any growth (zero steady-state
+     * churn). When the cursor fills, walk to the next-older block. */
+    for (Block* b = cur_; b != nullptr; b = b->older) {
         const size_t off = align_up(b->off, align);
         if (off + n <= b->cap) {
             const size_t consumed = off + n - b->off;
             b->off = off + n;
             used_ += consumed;
+            cur_ = b;
             return b->data() + off;
         }
     }
@@ -92,6 +100,7 @@ void* Arena::alloc(size_t n, size_t align) noexcept {
 
 void Arena::reset() noexcept {
     for (Block* b = head_; b != nullptr; b = b->older) b->off = 0;
+    cur_ = head_;
     used_ = 0;
 }
 
@@ -104,6 +113,7 @@ void Arena::clear() noexcept {
     }
     head_ = nullptr;
     tail_ = nullptr;
+    cur_ = nullptr;
     used_ = total_ = nblocks_ = 0;
     next_cap_ = kDefaultChunk;
 }

@@ -24,7 +24,8 @@ foreach(test
     net_pool_test
     net_meter_offline_test
     provider_test
-    prompt_test)
+    prompt_test
+    graph_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
@@ -45,6 +46,10 @@ set_tests_properties(config_test PROPERTIES
 # prompt_test loads src/prompt/templates and the provider wire fixtures, so it
 # runs from the repo root.
 set_tests_properties(prompt_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+# graph_test indexes the workspace fixtures, so it runs from the repo root.
+set_tests_properties(graph_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # store_test runs the sqlite suite only when the optional backend is built.

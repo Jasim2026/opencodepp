@@ -211,6 +211,7 @@ core::error_code HttpParser::parse_head() {
             if (!parse_u64(cl, len))
                 return core::make_error_code(core::Err::e_proto_parse);
             content_length_ = len;
+            length_framed_ = true;
             if (len > max_body_) return core::make_error_code(core::Err::e_net_overflow);
         } else {
             eof_framed_ = true;
@@ -284,7 +285,7 @@ size_t HttpParser::take(char* dst, size_t n) {
 bool HttpParser::body_done() const noexcept {
     if (!head_done_) return false;
     if (chunked_) return chunked_done_;
-    if (content_length_ > 0) return body_got_ >= content_length_;
+    if (length_framed_) return body_got_ >= content_length_; /* incl. 0 */
     return false; /* EOF-framed: only the transport knows */
 }
 

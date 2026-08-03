@@ -78,8 +78,7 @@ public:
 
     /* Body fully received per framing. EOF-framed responses never return true
      * here; the drain loop treats transport EOF as the terminator. */
-    bool body_done() const noexcept;
-    bool keep_alive() const noexcept { return head_.keep_alive; }
+    bool body_done() const noexcept;    bool keep_alive() const noexcept { return head_.keep_alive; }
 
     void set_max_body(uint64_t n) noexcept { max_body_ = n; }
 
@@ -99,6 +98,7 @@ private:
     uint64_t chunk_size_ = 0;
     bool chunked_done_ = false;
     bool eof_framed_ = false;
+    bool length_framed_ = false; /* Content-Length present (incl. 0) */
 };
 
 /* Drive transport reads into `p` until the body is complete per framing,

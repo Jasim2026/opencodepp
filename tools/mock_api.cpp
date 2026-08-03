@@ -11,9 +11,17 @@
 //
 // Usage:
 //   mock_api [--port N] [--response-file PATH] [--listen 127.0.0.1|0.0.0.0]
+//            [--scenario NAME]
 //
 // --response-file: file whose raw bytes become the SSE response body (headers
 // are added by the server). Default: a built-in 3-event script.
+//
+// --scenario NAME: Phase 4 fault injection, applied to every POST /v1/chat:
+//   ok            default scripted SSE
+//   rate_limit    429 with Retry-After: 1
+//   server_error  500 with an empty body
+//   truncate      headers claim the full body, then the stream is cut mid-frame
+//   garbage       non-HTTP garbage bytes, then close
 #define _POSIX_C_SOURCE 200809L
 
 #include <arpa/inet.h>
@@ -130,9 +138,10 @@ void respond(int fd, int status, const char* status_text, const char* content_ty
 
 /* Route by method + path.
  *   GET  /health -> 200 text/plain "ok\n"
- *   POST /v1/chat -> 200 text/event-stream (scripted SSE)
- * Anything else -> 404. Phase 4 upgrades this to fault scenarios. */
-void handle(int fd, const std::string& script, bool verbose) {
+ *   POST /v1/chat -> scripted SSE, or the configured fault scenario
+ * Anything else -> 404. */
+void handle(int fd, const std::string& script, bool verbose,
+            const std::string& scenario) {
     const std::string reqline = read_request(fd);
     std::string method = "GET", path = "/";
     {
@@ -149,6 +158,48 @@ void handle(int fd, const std::string& script, bool verbose) {
         return;
     }
     if (method == "POST" && path == "/v1/chat") {
+        if (scenario == "rate_limit") {
+            const char* h = "HTTP/1.1 429 Too Many Requests\r\n"
+                            "Retry-After: 1\r\n"
+                            "Content-Length: 0\r\n"
+                            "Connection: close\r\n"
+                            "\r\n";
+            send_all(fd, h, std::strlen(h));
+            if (verbose)
+                std::fprintf(stderr, "mock_api: injected 429\n");
+            return;
+        }
+        if (scenario == "server_error") {
+            const char* h = "HTTP/1.1 500 Internal Server Error\r\n"
+                            "Content-Length: 0\r\n"
+                            "Connection: close\r\n"
+                            "\r\n";
+            send_all(fd, h, std::strlen(h));
+            if (verbose)
+                std::fprintf(stderr, "mock_api: injected 500\n");
+            return;
+        }
+        if (scenario == "truncate") {
+            char head[256];
+            int n = std::snprintf(head, sizeof head,
+                                  "HTTP/1.1 200 OK\r\n"
+                                  "Content-Type: text/event-stream\r\n"
+                                  "Connection: close\r\n"
+                                  "Content-Length: %zu\r\n"
+                                  "\r\n",
+                                  script.size());
+            send_all(fd, head, static_cast<size_t>(n));
+            send_all(fd, script.data(), script.size() / 2);
+            if (verbose)
+                std::fprintf(stderr, "mock_api: truncated SSE stream\n");
+            return;
+        }
+        if (scenario == "garbage") {
+            send_all(fd, "NOT HTTP\r\n\r\n%^&*garbage\r\n", 24);
+            if (verbose)
+                std::fprintf(stderr, "mock_api: sent garbage bytes\n");
+            return;
+        }
         respond(fd, 200, "OK", "text/event-stream", script);
         if (verbose)
             std::fprintf(stderr, "mock_api: served %zu-byte SSE script\n",
@@ -161,10 +212,13 @@ void handle(int fd, const std::string& script, bool verbose) {
 
 void usage(const char* argv0) {
     std::fprintf(stderr,
-                 "usage: %s [--port N] [--response-file PATH] [--listen all]\n"
+                 "usage: %s [--port N] [--response-file PATH] [--listen all]"
+                 " [--scenario NAME]\n"
                  "  --port N         listen port (default 8123)\n"
                  "  --response-file  raw SSE body to serve (default: built-in)\n"
-                 "  --listen all     bind 0.0.0.0 instead of 127.0.0.1\n",
+                 "  --listen all     bind 0.0.0.0 instead of 127.0.0.1\n"
+                 "  --scenario       ok|rate_limit|server_error|truncate|garbage"
+                 " (default ok)\n",
                  argv0);
 }
 
@@ -175,6 +229,7 @@ int main(int argc, char** argv) {
     const char* response_file = nullptr;
     bool loopback = true;
     bool verbose = true;
+    std::string scenario = "ok";
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -185,6 +240,8 @@ int main(int argc, char** argv) {
                    std::strcmp(argv[i + 1], "all") == 0) {
             loopback = false;
             ++i;
+        } else if (std::strcmp(argv[i], "--scenario") == 0 && i + 1 < argc) {
+            scenario = argv[++i];
         } else if (std::strcmp(argv[i], "-q") == 0) {
             verbose = false;
         } else {
@@ -205,7 +262,7 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "mock_api: accept: %s\n", std::strerror(errno));
             break;
         }
-        handle(cfd, script, verbose);
+        handle(cfd, script, verbose, scenario);
         ::close(cfd);
     }
     ::close(listener);

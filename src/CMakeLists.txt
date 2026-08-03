@@ -17,6 +17,11 @@ set(OPENCODE_CORE_SOURCES
   core/metrics.cpp
   core/channel.cpp
   core/task.cpp
+  graph/callgraph.cpp
+  graph/index.cpp
+  graph/lazy.cpp
+  graph/queries.cpp
+  graph/symbols.cpp
   msg/codec.cpp
   msg/message.cpp
   msg/tokens.cpp

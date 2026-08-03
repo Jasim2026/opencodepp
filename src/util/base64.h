@@ -1,5 +1,5 @@
 /*
- * base64.h — RFC 4648 base64, allocation-free encode/decode into caller
+ * base64.h -- RFC 4648 base64, allocation-free encode/decode into caller
  * buffers. Used for wire payloads and patch content in messages.
  */
 #ifndef OPENCODE_UTIL_BASE64_H

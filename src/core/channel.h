@@ -1,8 +1,8 @@
 /*
- * channel.h — bounded multi-producer/single-consumer message queue.
+ * channel.h -- bounded multi-producer/single-consumer message queue.
  *
  * Fixed-capacity ring; every op is allocation-free after construction. Used for
- * event fan-out and cross-thread handoff (host / worker → loop thread).
+ * event fan-out and cross-thread handoff (host / worker -> loop thread).
  *
  * Semantics:
  *   - producers (any thread) call try_push(); a successful push fires the

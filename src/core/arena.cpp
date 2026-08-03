@@ -70,7 +70,7 @@ void* Arena::alloc(size_t n, size_t align) noexcept {
     if (align > kAlign) align = kAlign;
     if (n == 0) n = 1;
 
-    /* Scan oldest → newest so a reset workload reuses existing blocks before
+    /* Scan oldest -> newest so a reset workload reuses existing blocks before
      * growing (steady-state zero-churn after warmup). */
     for (Block* b = tail_; b != nullptr; b = b->newer) {
         const size_t off = align_up(b->off, align);

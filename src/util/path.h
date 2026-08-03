@@ -1,5 +1,5 @@
 /*
- * path.h — allocation-light path helpers (POSIX-style, '/'-separated).
+ * path.h -- allocation-light path helpers (POSIX-style, '/'-separated).
  */
 #ifndef OPENCODE_UTIL_PATH_H
 #define OPENCODE_UTIL_PATH_H

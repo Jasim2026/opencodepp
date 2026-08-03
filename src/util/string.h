@@ -1,5 +1,5 @@
 /*
- * string.h — small string helpers. Allocation-light: most routines operate on
+ * string.h -- small string helpers. Allocation-light: most routines operate on
  * string_views; only the *cat/to_* variants touch a caller-provided buffer or
  * std::string.
  */

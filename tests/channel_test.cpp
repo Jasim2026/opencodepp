@@ -40,7 +40,7 @@ void test_backpressure() {
     CHECK(ch.try_push(0, &a, sizeof(int)));
     CHECK(ch.try_push(0, &b, sizeof(int)));
     CHECK(ch.full());
-    CHECK(!ch.try_push(0, &c, sizeof(int))); /* full → reject, no block */
+    CHECK(!ch.try_push(0, &c, sizeof(int))); /* full -> reject, no block */
     Channel::Message m;
     CHECK(ch.try_pop(m) == Channel::kOk);
     CHECK(ch.try_push(0, &c, sizeof(int)));
@@ -53,7 +53,7 @@ void test_producer_close() {
     CHECK(ch.try_push(0, &a, sizeof(int)));
     ch.close();
     CHECK(ch.closed());
-    CHECK(!ch.try_push(0, &a, sizeof(int))); /* closed → reject */
+    CHECK(!ch.try_push(0, &a, sizeof(int))); /* closed -> reject */
     Channel::Message m;
     CHECK(ch.try_pop(m) == Channel::kOk);   /* drain remaining */
     CHECK(ch.try_pop(m) == Channel::kClosed); /* then closed */
@@ -82,7 +82,7 @@ void test_wakeup_hook() {
     ch.try_push(0, &a, sizeof(int));
     ch.try_push(0, &a, sizeof(int));
     CHECK(wakes == 2);
-    CHECK(!ch.try_push(0, &a, sizeof(int)) || true); /* full → still 2 wakes */
+    CHECK(!ch.try_push(0, &a, sizeof(int)) || true); /* full -> still 2 wakes */
 }
 
 void test_multiproducer() {

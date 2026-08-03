@@ -1,5 +1,5 @@
 /*
- * task.h — stackless coroutines over the event loop (the async abstraction the
+ * task.h -- stackless coroutines over the event loop (the async abstraction the
  * agent loop drives). C++20 coroutines; no exceptions, no RTTI.
  *
  *   co_task tick(TaskScheduler&) {

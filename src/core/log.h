@@ -1,5 +1,5 @@
 /*
- * log.h — per-instance logfmt logger. Zero globals; zero heap in the hot path.
+ * log.h -- per-instance logfmt logger. Zero globals; zero heap in the hot path.
  *
  * Lines are formatted into a fixed stack buffer (logfmt: message then
  * key=value pairs) and delivered to a registered sink. Sinks: a C callback

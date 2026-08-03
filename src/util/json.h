@@ -1,5 +1,5 @@
 /*
- * json.h — minimal JSON DOM: parse + write, no external library. Enough for
+ * json.h -- minimal JSON DOM: parse + write, no external library. Enough for
  * config, provider request/response framing, and structured tool results.
  *
  * Lifetime: parsed strings reference the input buffer (zero-copy) UNLESS the

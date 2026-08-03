@@ -1,5 +1,5 @@
 /*
- * metrics.h — per-instance counters, gauges, histograms.
+ * metrics.h -- per-instance counters, gauges, histograms.
  *
  * Instance-scoped (zero globals). Histograms use fixed exponential buckets so
  * p50/p95 are O(buckets) and allocation-free at observe time. Names must be

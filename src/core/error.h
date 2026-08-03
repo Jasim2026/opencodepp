@@ -223,9 +223,9 @@ inline constexpr error_code make_error_code(Err e, uint32_t detail = 0) {
 }
 
 /* Policy helpers (feed the Phase 4 net policy and the Phase 10 agent loop):
- *   is_retryable()  — the failure is transient by nature; a retry is allowed
+ *   is_retryable()  -- the failure is transient by nature; a retry is allowed
  *                     (the retry budget, Phase 6, decides whether it runs).
- *   is_transient()  — same classification exposed for the offline/queue path.
+ *   is_transient()  -- same classification exposed for the offline/queue path.
  */
 inline bool is_retryable(error_code ec) noexcept {
     return ec.retry() == Retry::retryable;

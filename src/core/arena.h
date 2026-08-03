@@ -1,9 +1,9 @@
 /*
- * arena.h — chunked bump allocator (the memory foundation).
+ * arena.h -- chunked bump allocator (the memory foundation).
  *
  * Deterministic, no per-allocation bookkeeping, O(1) reset, geometric growth.
  * Chunks are malloc'd (16 KiB initial) and reused across resets, so steady-state
- * churn is zero after warmup — a key T2 ingredient (per-turn allocation ~0).
+ * churn is zero after warmup -- a key T2 ingredient (per-turn allocation ~0).
  *
  * Thread-safety: an Arena is NOT thread-safe; one Arena per owning context.
  */

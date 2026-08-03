@@ -1,5 +1,5 @@
 /*
- * event_loop.h — single-threaded I/O event loop.
+ * event_loop.h -- single-threaded I/O event loop.
  *
  * Abstraction over epoll (Linux) with a poll() fallback. Owns: an fd registry
  * (read/write/error interest per fd), a timer heap, a cross-thread wakeup pipe.

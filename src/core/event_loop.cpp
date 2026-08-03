@@ -258,7 +258,7 @@ int EventLoop::run_once(int timeout_ms) {
             if (d < 0) d = 0;
             if (wait < 0 || d < wait) wait = d > INT_MAX ? INT_MAX : static_cast<int>(d);
         }
-        if (wait == 0) continue; /* timer due this instant → fire it */
+        if (wait == 0) continue; /* timer due this instant -> fire it */
 
 #ifdef __linux__
         struct epoll_event evs[kMaxEvents];
@@ -307,7 +307,7 @@ int EventLoop::run_once(int timeout_ms) {
         }
         if (n > 0) return handled;
 #endif
-        /* n == 0: the wait expired with no fd event → re-check timers. */
+        /* n == 0: the wait expired with no fd event -> re-check timers. */
     }
 }
 

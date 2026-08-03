@@ -55,7 +55,7 @@ bool await_timer::await_suspend(
     }
     timer_id_ = loop_->add_timer(ms_, &await_timer::on_timer, this, true);
     ok_ = timer_id_ != 0;
-    return ok_; /* false → resume immediately (timer add failed) */
+    return ok_; /* false -> resume immediately (timer add failed) */
 }
 
 void await_timer::on_timer(void* userdata, uint64_t /*timer_id*/) noexcept {

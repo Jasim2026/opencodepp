@@ -1,4 +1,4 @@
-# Phase 0 (baseline) — placeholder trace.
+# Phase 0 (baseline) -- placeholder trace.
 # Format: each line is a JSON-serialized request body as sent to the LLM
 # provider by the Go baseline for one task, one line per model call.
 # Used only for T1 request-byte comparisons. Not an ML dataset.

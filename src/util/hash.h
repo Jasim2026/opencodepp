@@ -1,5 +1,5 @@
 /*
- * hash.h — stable, allocation-free hashes for cache/session keys and quick
+ * hash.h -- stable, allocation-free hashes for cache/session keys and quick
  * structural fingerprinting. None of these are cryptographic.
  */
 #ifndef OPENCODE_UTIL_HASH_H
@@ -11,7 +11,7 @@
 
 namespace opencode::util {
 
-/* FNV-1a 64 — good dispersion, trivially portable (stable across runs/ABIs). */
+/* FNV-1a 64 -- good dispersion, trivially portable (stable across runs/ABIs). */
 inline uint64_t fnv1a64(std::string_view s, uint64_t seed = 1469598103934665603ull) {
     uint64_t h = seed;
     for (unsigned char c : s) {

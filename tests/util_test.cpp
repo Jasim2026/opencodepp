@@ -79,12 +79,12 @@ void test_base64() {
     CHECK(b64_decode("", dec, sizeof dec, empty).ok());
     CHECK(empty == 0);
 
-    /* bad alphabet → proto_parse */
+    /* bad alphabet -> proto_parse */
     char out[16];
     size_t o = 0;
     CHECK(b64_decode("ab*c", out, sizeof out, o).code() ==
           opencode::core::Err::e_proto_parse);
-    /* encoded size overflows a tiny buffer → overflow */
+    /* encoded size overflows a tiny buffer -> overflow */
     CHECK(b64_decode("SGVsbG8sIFdvcmxkIQ==", out, 4, o).code() ==
           opencode::core::Err::e_overflow);
 }

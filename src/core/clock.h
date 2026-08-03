@@ -1,5 +1,5 @@
 /*
- * clock.h — monotonic + wall-clock helpers. No allocation, no global state.
+ * clock.h -- monotonic + wall-clock helpers. No allocation, no global state.
  */
 #ifndef OPENCODE_CORE_CLOCK_H
 #define OPENCODE_CORE_CLOCK_H

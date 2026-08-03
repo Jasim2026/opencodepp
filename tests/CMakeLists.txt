@@ -16,7 +16,8 @@ foreach(test
     msg_test
     codec_test
     tokens_test
-    config_test)
+    config_test
+    model_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})

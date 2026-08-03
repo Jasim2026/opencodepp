@@ -15,6 +15,7 @@ add_library(opencodepp_core OBJECT
   core/metrics.cpp
   core/channel.cpp
   core/task.cpp
+  msg/message.cpp
   util/base64.cpp
   util/json.cpp)
 target_include_directories(opencodepp_core PUBLIC

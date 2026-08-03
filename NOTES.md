@@ -87,6 +87,33 @@ production code as TODO stubs. Checkpoint reports reference this file by section
 - **`rtt_p50() > 0` is flaky on fast localhost**: an -O3 exchange can complete
   in < 1 ms, so percentile assertions failed in release while passing in debug.
   Assert `rtt_samples() >= 1` (count) instead of a duration inequality.
+- **`util::JVal` is zero-copy: `JVal::Str(std::string)` fed a temporary
+  dangles** — the `str` view points into caller memory that dies with the
+  temporary. Every dynamically built string must go through the local
+  `owned_str()` idiom (`j.kind = string; j.owned = std::move(s); j.str =
+  j.owned`). Missed ownership crashes exactly at the first `j.str` read (found
+  while generating anthropic request bodies).
+- **`split_url` strips the trailing slash and leaves `path` empty when
+  absent** — adapters must append their own `/v1/...` (`url.path +
+  "/v1/chat/completions"`). Pinned by the golden-byte fixtures
+  (`https://api.openai.com/v1` → `/v1/chat/completions`).
+- **Anthropic `message_delta.usage` carries only `output_tokens`**:
+  overwriting the whole `Usage` from each delta wipes `input_tokens` to 0.
+  Update per-field, only when the key is present (field-existence check, not a
+  tolerant `get_num` default).
+- **Hand-written golden fixtures gain a trailing `\n`** → byte-comparison with
+  the adapter's compact `to_json` output (no trailing newline) fails by exactly
+  one byte. Trim the trailing newline in the test harness's `read_file` and
+  keep the fixtures readable.
+- **`std::string_view` (from `error_code::message()`) has no `.c_str()`** —
+  wrap `std::string(ec.message())` before `printf("%s", ...)`; a blanket sed
+  of `.message().c_str()` → `.c_str()` mis-rewrites it, so grep after.
+- **A user-declared `~T` suppresses the implicit move ctor**: a factory that
+  returns `Mock` by value (`start_mock()`) broke with "use of deleted copy".
+  Fix: explicit move ctor + move-assign, delete copy. Related: a joinable
+  `std::thread` abandoned on an early `return` calls `std::terminate` — give
+  the RAII wrapper a destructor that stops + joins the server thread on every
+  path.
 
 ---
 

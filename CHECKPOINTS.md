@@ -15,7 +15,7 @@ a phase may not be closed on any target regression.
 | 02 Message/codec | `08_PHASE_02.md` | **done** | `reports/02.md` | codec decode 9.4x vs JSON; corpus <10% |
 | 03 Config/model/store | `09_PHASE_03.md` | **done** | `reports/03.md` | config, catalog, mem/sqlite store |
 | 04 Networking | `10_PHASE_04.md` | **done** | `reports/04.md` | socket/tls/http/sse/pool/policy/offline/drill; CI 8/8 (run 30832057009) |
-| 05 Providers | `11_PHASE_05.md` | open | `reports/05.md` | anthropic/openai/gemini/compat |
+| 05 Providers | `11_PHASE_05.md` | **done** | `reports/05.md` | 4 adapters + factory/resolver + probe; CI 8/8 (run 30838418453) |
 | 06 Prompts/context | `12_PHASE_06.md` | open | `reports/06.md` | templates, assembler, budget |
 | 07 Code graph | `13_PHASE_07.md` | open | `reports/07.md` | symbol index, call graph, snippets |
 | 08 Tools | `14_PHASE_08.md` | open | `reports/08.md` | registry, schema, gate, shell |

@@ -167,27 +167,28 @@ core::error_code assemble_context(const ContextInput& in, ContextPlan& out) {
         sys_text += "\n";
     }
 
-    /* 4. message window: newest user always kept; the last N assistant turns
-     * (and the user turns immediately preceding them) are Tier 1. */
+    /* 4. message window: newest user always kept, and every message from the
+     * Nth-newest assistant turn (N = recent_assistant_turns) onward is Tier 1
+     * -- the last N assistant turns plus their interleaved tool frames. */
     const MsgList& hist = *in.messages;
     const std::uint32_t sys_tokens = msg::estimate_tokens(sys_text);
     const std::uint32_t keep_assistant =
         in.recent_assistant_turns ? in.recent_assistant_turns : 1;
-    std::uint32_t assist_seen = 0;
+    std::uint32_t need = keep_assistant;
     std::size_t tier1_from = hist.size();
     for (std::size_t i = hist.size(); i-- > 0;) {
-        const Message& m = hist[i];
-        if (m.role == msg::Role::assistant) {
-            if (assist_seen >= keep_assistant) {
-                tier1_from = i + 1;
-                break;
+        if (hist[i].role == msg::Role::assistant) {
+            if (need > 0) {
+                --need;
+                tier1_from = i;
+            } else {
+                break; /* older assistant turn: everything below is Tier 2 */
             }
-            ++assist_seen;
-            tier1_from = i;
-        } else if (m.role == msg::Role::user && i + 1 == hist.size()) {
-            tier1_from = i; /* newest user message */
         }
     }
+    /* a history with no assistant turns still keeps the newest user message */
+    if (tier1_from == hist.size() && !hist.empty())
+        tier1_from = hist.size() - 1;
 
     std::uint64_t total = 0;
     for (std::size_t i = 0; i < hist.size(); ++i) {

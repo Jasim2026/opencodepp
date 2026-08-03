@@ -4,8 +4,10 @@
 // Runs from the repo root (fixtures at tests/fixtures/workspace/).
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
+#include <sys/stat.h>
 
 #include "graph/index.h"
 
@@ -42,6 +44,13 @@ std::size_t count_named(const std::vector<Sym>& syms, const std::string& name) {
 }
 
 void write_file(const std::string& path, const std::string& content) {
+    /* the scratch dir may not exist on a fresh runner */
+    const char* slash = std::strrchr(path.c_str(), '/');
+    if (slash != nullptr && slash != path.c_str()) {
+        const std::string dir(path.c_str(), static_cast<size_t>(slash - path.c_str()));
+        const int rc = ::mkdir(dir.c_str(), 0755);
+        (void)rc; /* EEXIST is fine */
+    }
     FILE* f = std::fopen(path.c_str(), "wb");
     CHECK(f != nullptr);
     if (!f) return;

@@ -18,7 +18,11 @@ foreach(test
     tokens_test
     config_test
     model_test
-    store_test)
+    store_test
+    net_socket_test
+    net_http_test
+    net_pool_test
+    net_meter_offline_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})

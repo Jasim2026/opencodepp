@@ -50,6 +50,15 @@
       }
     },
     {
+      "name": "mbedtls",
+      "inherits": "dev",
+      "displayName": "Dev + mbedTLS net backend",
+      "description": "Dev (ASan/UBSan, -Werror) plus the optional mbedTLS TLS backend",
+      "cacheVariables": {
+        "OPENCODE_USE_MBEDTLS": "ON"
+      }
+    },
+    {
       "name": "size",
       "inherits": "base",
       "displayName": "Size (-Os, stripped)",
@@ -81,6 +90,7 @@
     { "name": "release", "configurePreset": "release" },
     { "name": "size", "configurePreset": "size" },
     { "name": "sqlite", "configurePreset": "sqlite" },
+    { "name": "mbedtls", "configurePreset": "mbedtls" },
     { "name": "android", "configurePreset": "android" }
   ],
   "testPresets": [
@@ -102,6 +112,11 @@
     {
       "name": "sqlite",
       "configurePreset": "sqlite",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "mbedtls",
+      "configurePreset": "mbedtls",
       "output": { "outputOnFailure": true }
     },
     {

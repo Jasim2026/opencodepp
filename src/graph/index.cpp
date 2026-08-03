@@ -10,6 +10,7 @@
 #include "graph/index.h"
 
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -36,8 +37,9 @@ bool read_file_text(const std::string& path, std::string& out) {
 
 } /* namespace */
 
-/* Open once: fstat (mtime+size fingerprint) + read in a single fd lifetime.
- * Shared with lazy.cpp's ensure_indexed. */
+/* Open once: fstat (mtime+size fingerprint) + mmap the whole file in a single
+ * fd lifetime (no per-block read syscalls). Shared with lazy.cpp's
+ * ensure_indexed. */
 bool read_file_stat(const std::string& path, std::string& out,
                     std::uint64_t& mtime, std::uint64_t& size) {
     const int fd = ::open(path.c_str(), O_RDONLY);
@@ -56,9 +58,21 @@ bool read_file_stat(const std::string& path, std::string& out,
 #endif
     size = static_cast<std::uint64_t>(st.st_size);
     out.clear();
-    char buf[8192];
-    ssize_t n;
-    while ((n = ::read(fd, buf, sizeof buf)) > 0) out.append(buf, static_cast<size_t>(n));
+    if (st.st_size > 0) {
+        char* m = static_cast<char*>(
+            ::mmap(nullptr, static_cast<size_t>(st.st_size), PROT_READ,
+                   MAP_PRIVATE, fd, 0));
+        if (m != MAP_FAILED) {
+            out.assign(m, static_cast<size_t>(st.st_size));
+            ::munmap(m, static_cast<size_t>(st.st_size));
+        } else {
+            /* fall back to plain reads when mmap is unavailable */
+            char buf[8192];
+            ssize_t n;
+            while ((n = ::read(fd, buf, sizeof buf)) > 0)
+                out.append(buf, static_cast<size_t>(n));
+        }
+    }
     ::close(fd);
     return true;
 }

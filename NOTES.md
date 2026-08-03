@@ -114,6 +114,35 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   `std::thread` abandoned on an early `return` calls `std::terminate` — give
   the RAII wrapper a destructor that stops + joins the server thread on every
   path.
+- **`estimate_tokens` treats an unbroken token as ONE word**: a 1 MB `'x'`
+  blob estimates to ~1 token (single prose word), so "huge message" truncation
+  tests silently pass. Use spaced text (`"word "` repeated) to build a
+  realistically heavy message; assert the truncation suffix, not just a count.
+- **The tiered-window scan must not overwrite its boundary**: the first cut of
+  the Phase 6 assembler set `tier1_from` while walking the newest assistant
+  turns, then overwrote it to `i+1` when hitting the (N+1)-th assistant —
+  silently demoting the newest assistant response to Tier 2 (omittable). Fix:
+  find the N-th-newest assistant and set the boundary once. The newest user
+  message stays Tier 1 even with no assistant turns in history.
+- **The system message has real token weight**: SYSTEM_BASE.md ~ 1.5 KB of
+  markdown text estimates to ~330-377 tokens (code-heavy path). Budget-gated
+  fixtures must reserve for it: Tier-2 room = cap − floor − tools − system, so
+  a "forces omission" fixture needs fillers that are individually heavy, not
+  just numerous. Filler tokens were repeatedly under-estimated (a 360-char
+  prose sentence ≈ 66-86 tokens).
+- **`JVal::find(key)` returns `nullptr` for a missing key**: corpus fixtures
+  read optional fields as `doc.find("available_tokens") ? (uint32_t)v->num :
+  default`; the ternary is required, dereferencing a missing key crashes.
+- **CMake `SUPPRESS_REGENERATION` breaks target discovery**: with
+  `CMAKE_SUPPRESS_REGENERATION=ON` (needed to dodge the FUSE ninja re-run
+  loop), ninja does NOT see new targets added to a CMakeLists — you must
+  re-run `cmake -S . -B build/<p> ...` by hand before building a newly-added
+  executable. `ninja: no work to do` despite a missing target = stale build
+  manifest.
+- **FUSE also strips the `+x` bit from built binaries** (separate from the
+  ninja mtime loop): `ctest` on /sdcard fails with `permission denied` even
+  though every binary links. Local verification copies each binary to `/tmp`
+  and runs it there; CI (native ext4) is unaffected.
 
 ---
 

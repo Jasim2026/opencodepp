@@ -16,7 +16,7 @@ a phase may not be closed on any target regression.
 | 03 Config/model/store | `09_PHASE_03.md` | **done** | `reports/03.md` | config, catalog, mem/sqlite store |
 | 04 Networking | `10_PHASE_04.md` | **done** | `reports/04.md` | socket/tls/http/sse/pool/policy/offline/drill; CI 8/8 (run 30832057009) |
 | 05 Providers | `11_PHASE_05.md` | **done** | `reports/05.md` | 4 adapters + factory/resolver + probe; CI 8/8 (run 30838418453) |
-| 06 Prompts/context | `12_PHASE_06.md` | open | `reports/06.md` | templates, assembler, budget |
+| 06 Prompts/context | `12_PHASE_06.md` | **done** | `reports/06.md` | templates, assembler, budget; CI 8/8 (run 30842898205) |
 | 07 Code graph | `13_PHASE_07.md` | open | `reports/07.md` | symbol index, call graph, snippets |
 | 08 Tools | `14_PHASE_08.md` | open | `reports/08.md` | registry, schema, gate, shell |
 | 09 Verification | `15_PHASE_09.md` | open | `reports/09.md` | gates + golden suite (T3) |
@@ -33,7 +33,7 @@ a phase may not be closed on any target regression.
 | T3 | bad edits applied (syntax error) | **0** | 09, 10 | — | — |
 | T3 | golden suite final-file pass | **≥ 95%** | 09, 10, 13 | — | — |
 | T3 | mechanical errors caught pre-apply | **100%** | 09 | — | — |
-| T1 | context tokens / task (edge) | **≤ 3,500** | 06, 13 | — | — |
+| T1 | context tokens / task (edge) | **≤ 3,500** | 06, 13 | 06: 396–1089 (corpus) | ✓ |
 | T1 | request bytes vs Go baseline | **≥ 40% fewer** | 06, 13 | — | — |
 | T1 | per-task total tokens (incl. retries) | **≤ 12,000** | 06, 10, 13 | — | — |
 | T2 | init → ready | **< 100 ms** | 13 | — | — |

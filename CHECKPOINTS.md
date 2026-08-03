@@ -12,7 +12,7 @@ a phase may not be closed on any target regression.
 |-------|-----------|--------|--------|-------|
 | 00 Foundation | `06_PHASE_00.md` | **done** | `reports/00.md` | CI (GitHub Actions) = test site |
 | 01 Core | `07_PHASE_01.md` | **done** | `reports/01.md` | arena 13x vs malloc; coroutines green |
-| 02 Message/codec | `08_PHASE_02.md` | open | `reports/02.md` | parts, binary codec, token estimator |
+| 02 Message/codec | `08_PHASE_02.md` | **done** | `reports/02.md` | codec decode 9.4x vs JSON; corpus <10% |
 | 03 Config/model/store | `09_PHASE_03.md` | open | `reports/03.md` | config, catalog, mem/sqlite store |
 | 04 Networking | `10_PHASE_04.md` | open | `reports/04.md` | socket/tls/http/sse/pool/policy/offline/drill |
 | 05 Providers | `11_PHASE_05.md` | open | `reports/05.md` | anthropic/openai/gemini/compat |

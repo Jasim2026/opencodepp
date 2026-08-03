@@ -6,5 +6,7 @@ target_link_libraries(bench_engine PRIVATE opencodepp_static)
 add_executable(mock_api mock_api.cpp)
 target_link_libraries(mock_api PRIVATE opencodepp_static)
 
-add_executable(drill drill.cpp)
-target_link_libraries(drill PRIVATE opencodepp_static)
+# drill is built once the net sources land in opencodepp_static (Phase 4
+# wiring); locally it compiles against the net sources directly.
+# add_executable(drill drill.cpp)
+# target_link_libraries(drill PRIVATE opencodepp_static)

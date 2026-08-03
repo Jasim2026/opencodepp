@@ -1,0 +1,41 @@
+# Build output
+build/
+build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+*.cmake.stamp
+
+# Objects / binaries
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.gcda
+*.gcno
+
+# Tooling
+*.profraw
+*.profdata
+compile_commands.json
+
+# Editors / OS
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+
+# Python bindings
+__pycache__/
+*.pyc
+bindings/python/dist/

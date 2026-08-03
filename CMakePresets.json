@@ -1,0 +1,98 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "displayName": "Dev (ASan/UBSan, -Werror)",
+      "description": "Debug + sanitizers + warnings-as-errors; optional deps OFF for now",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OPENCODE_ENABLE_SANITIZERS": "ON",
+        "OPENCODE_USE_MBEDTLS": "OFF",
+        "OPENCODE_USE_TREE_SITTER": "OFF",
+        "OPENCODE_USE_SQLITE": "OFF",
+        "OPENCODE_USE_ZSTD": "OFF",
+        "OPENCODE_USE_DOCTEST": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release (-O3)",
+      "description": "Optimized build; optional deps flip ON as their phases land",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OPENCODE_USE_MBEDTLS": "OFF",
+        "OPENCODE_USE_TREE_SITTER": "OFF",
+        "OPENCODE_USE_SQLITE": "OFF",
+        "OPENCODE_USE_ZSTD": "OFF",
+        "OPENCODE_USE_DOCTEST": "OFF"
+      }
+    },
+    {
+      "name": "size",
+      "inherits": "base",
+      "displayName": "Size (-Os, stripped)",
+      "description": "Minimal footprint build: -Os, stripped binaries, deps OFF",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS": "-Os",
+        "CMAKE_C_FLAGS": "-Os",
+        "CMAKE_EXE_LINKER_FLAGS": "-s",
+        "OPENCODE_USE_MBEDTLS": "OFF",
+        "OPENCODE_USE_TREE_SITTER": "OFF",
+        "OPENCODE_USE_SQLITE": "OFF",
+        "OPENCODE_USE_ZSTD": "OFF"
+      }
+    },
+    {
+      "name": "android",
+      "inherits": "base",
+      "displayName": "Android (NDK)",
+      "description": "Cross-build for Android via the NDK toolchain stub (Phase 12)",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_NAME": "Android",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/android.toolchain.cmake"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "size", "configurePreset": "size" },
+    { "name": "android", "configurePreset": "android" }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "size",
+      "configurePreset": "size",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "android",
+      "configurePreset": "android",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

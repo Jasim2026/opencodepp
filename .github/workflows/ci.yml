@@ -1,0 +1,99 @@
+# OpenCode++ CI — GitHub Actions is the authoritative test site.
+#
+# Jobs:
+#   1. build     : configure+build+ctest for the dev/release/size presets
+#   2. abi-check : the C ABI header must compile as pure C11 (gcc + clang) and C++20
+#   3. mock-api  : the mock provider server actually streams SSE on a live socket
+#   4. hygiene    : hidden-character + whitespace checks on sources
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [dev, release, size]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} -j "$(nproc)"
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  abi-check:
+    name: ABI header (C11 + C++20)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compilers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc g++ clang
+
+      - name: gcc -std=c11
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -Werror -fsyntax-only include/opencode/opencode.h
+
+      - name: clang -std=c11
+        run: clang -std=c11 -Wall -Wextra -Wpedantic -Werror -fsyntax-only include/opencode/opencode.h
+
+      - name: g++ -std=c++20
+        run: g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only -Iinclude include/opencode/opencode.h
+
+  mock-api:
+    name: mock provider smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+
+      - name: Configure & build (dev)
+        run: |
+          cmake --preset dev
+          cmake --build --preset dev -j "$(nproc)"
+
+      - name: Start mock_api and verify SSE stream
+        run: |
+          ./build/dev/tools/mock_api --port 8123 &
+          MOCK_PID=$!
+          trap "kill $MOCK_PID 2>/dev/null || true" EXIT
+          sleep 1
+          curl -fsS http://127.0.0.1:8123/health | grep -qx ok
+          # SSE chat: stream 3 data events then a done event
+          OUT="$(curl -fsSN --max-time 10 http://127.0.0.1:8123/v1/chat)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"type":"text"'
+          echo "$OUT" | grep -q '"finish_reason":"stop"'
+          echo "mock-api SSE smoke: OK"
+
+  hygiene:
+    name: source hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hidden-character scan
+        run: bash scripts/check_hidden_chars.sh

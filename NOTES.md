@@ -172,6 +172,32 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   `bench_graph` tmpfs fallback is still worth keeping for real Linux (CI)
   where /dev/shm is tmpfs and reads are near-free.
 
+- **`patch::apply` lost ctx/rem interleaving** — the original parser stored
+  only `ctx` (context lines) and `rem` (old-file removal lines), then matched
+  on `old_lines = rem+ctx`. A patch that alternates removals with context lines
+  (e.g. `ctx rem ctx rem`) was flattened into `rem rem ctx ctx ctx`, producing
+  `old_lines` with wrong ordering vs the file content. Match failed with
+  `e_tool_reject`. Fix: the `Hunk` now carries `old_body` and `new_body` as
+  ordered vectors of `(is_ctx, text)` entries; matching and replacement operate
+  on these ordered sequences. The test fixture `patch_multi_interleave` covers
+  the previously-broken pattern.
+- **`split_lines` trailing empty element on `\n`-terminated input** —
+  `pos <= text.size()` let the final `find` land one past the last `\n`, adding
+  a spurious empty string to the vector. When fed to `join_lines`, the empty
+  element became an extra `\n`, doubling the trailing newline. One-char fix:
+  `pos < text.size()`. The round-trip test (`lines → join → split` equality
+  assertion) now catches this.
+- **Hidden Unicode arrows in comments → CI failure** — `patch.cpp` and
+  `util.cpp` contained literal `→` (U+2192 RIGHTWARDS ARROW) characters in
+  comment text, copied from human-readable spec snippets. CI source-hygiene
+  treats non-ASCII in non-string-literal C++ as a warning. The fix is
+  mechanical: replace with ASCII `->`. When porting spec prose into code, scan
+  for non-ASCII before committing.
+- **`util::split` delimiter type mismatch** — `split(path, '/')` passes a
+  `char` to a function that takes `std::string_view`. GCC allows the implicit
+  conversion but Clang (and CI `-Werror`) reject it. Always use `"/"` (string
+  literal, implicitly `string_view`) not `'/'` (char).
+
 ---
 
 <!-- appends only; do not rewrite history -->

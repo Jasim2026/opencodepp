@@ -27,6 +27,7 @@ set(OPENCODE_CORE_SOURCES
   graph/queries.cpp
   graph/symbols.cpp
   memory/entry.cpp
+  memory/session_memory.cpp
   msg/codec.cpp
   msg/message.cpp
   msg/tokens.cpp

@@ -32,6 +32,7 @@
 #include "agent/feedback.h"
 #include "agent/intent.h"
 #include "core/clock.h"
+#include "memory/session_memory.h"
 #include "net/http1.h"
 #include "net/socket.h"
 #include "net/sse.h"
@@ -110,6 +111,15 @@ void Agent::sleep_backoff(std::uint64_t ms) {
         std::this_thread::sleep_for(std::chrono::milliseconds(step));
         ms -= step;
     }
+}
+
+void Agent::checkpoint(const std::vector<std::string>& applied_edits) {
+    if (session_.store() == nullptr) return;
+    std::string hash;
+    if (!memory::workspace_hash(session_.workspace(), hash).ok()) hash.clear();
+    memory::checkpoint(session_.store(), session_.id(), session_.messages(),
+                       session_.tokens_used(), applied_edits, hash);
+    session_.emit("checkpoint", session_.id());
 }
 
 core::error_code Agent::assemble(const IntentPlan& plan, provider::MsgList& msgs,
@@ -609,12 +619,16 @@ DriveResult Agent::drive(std::string_view user_input) {
             if (aborted_by_feedback_) break;
         }
 
+        checkpoint(result.applied_edits);
+
         if (result.ec == Err::e_cancelled) break;
         if (aborted_by_feedback_) {
             result.ec = make_error_code(Err::e_aborted);
             break;
         }
     }
+
+    checkpoint(result.applied_edits);
 
     result.tokens_used = session_.tokens_used();
 

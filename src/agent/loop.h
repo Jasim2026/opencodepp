@@ -106,6 +106,9 @@ private:
      * thread during a retry pause). */
     void sleep_backoff(std::uint64_t ms);
 
+    /* Persist a session checkpoint (best-effort, no-op without a Store). */
+    void checkpoint(const std::vector<std::string>& applied_edits);
+
     /* Budget-aware context assembly for one round. */
     core::error_code assemble(const IntentPlan& plan, provider::MsgList& msgs,
                               provider::ToolsSpec& tools, provider::Budget& budget);

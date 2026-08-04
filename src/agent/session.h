@@ -116,6 +116,9 @@ public:
      * Returns the session id ("" on failure). */
     std::string persist();
 
+    /* Access the optional Store (nullable). Used by memory checkpoint/resume. */
+    store::Store* store() const noexcept { return store_; }
+
 private:
     std::string next_msg_id();
     std::uint64_t budget_cap() const noexcept;

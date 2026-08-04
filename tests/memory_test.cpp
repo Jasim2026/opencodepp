@@ -11,6 +11,9 @@
 
 #include "config/config.hpp"
 #include "memory/entry.h"
+#include "memory/session_memory.h"
+#include "msg/message.h"
+#include "store/mem_store.hpp"
 
 namespace {
 int failures = 0;
@@ -172,6 +175,116 @@ int main() {
         CHECK(cfg.memory.max_value_chars == 1024);
         CHECK(cfg.memory.max_entries == 100);
         CHECK(cfg.memory.max_key_chars == 64);  /* default */
+    }
+
+    /* ---- checkpoint / resume round-trip ---- */
+    {
+        auto mem = opencode::store::create_mem_store();
+        std::string sess = "sess-test-1";
+
+        std::vector<opencode::msg::Message> msgs;
+        {
+            opencode::msg::Message u;
+            u.id = "m1";
+            u.session_id = sess;
+            u.role = opencode::msg::Role::user;
+            u.parts.push_back(opencode::msg::Text{"add a license"});
+            msgs.push_back(std::move(u));
+        }
+        {
+            opencode::msg::Message a;
+            a.id = "m2";
+            a.session_id = sess;
+            a.role = opencode::msg::Role::assistant;
+            a.parts.push_back(opencode::msg::Text{"done"});
+            msgs.push_back(std::move(a));
+        }
+        const std::vector<std::string> edits = {"LICENSE (file.write)"};
+
+        const std::string saved = opencode::memory::checkpoint(
+            mem.get(), sess, msgs, 42, edits, "hash-abc");
+        CHECK(saved == sess);
+
+        const std::string ws = "/tmp/opencode_mem_ws1";
+        ::system(("rm -rf " + ws + " && mkdir -p " + ws).c_str());
+
+        /* resume with a matching workspace hash */
+        std::string h1;
+        CHECK(opencode::memory::workspace_hash(ws, h1).ok());
+        CHECK(opencode::memory::workspace_hash(ws, h1).ok());
+        opencode::memory::SessionCheckpoint r = opencode::memory::resume(
+            mem.get(), sess, ws);
+        CHECK(r.found);
+        CHECK(r.messages.size() == 2);
+        CHECK(r.messages[0].role == opencode::msg::Role::user);
+        CHECK(r.messages[1].content_text() == "done");
+        CHECK(r.tokens_used == 42);
+        CHECK(r.applied_edits.size() == 1);
+        CHECK(r.applied_edits[0] == "LICENSE (file.write)");
+        CHECK(!r.workspace_hash.empty());
+    }
+
+    /* ---- resume workspace-hash mismatch ---- */
+    {
+        auto mem = opencode::store::create_mem_store();
+        std::string sess = "sess-test-2";
+
+        std::vector<opencode::msg::Message> msgs;
+        opencode::msg::Message u;
+        u.id = "m1";
+        u.session_id = sess;
+        u.role = opencode::msg::Role::user;
+        u.parts.push_back(opencode::msg::Text{"hello"});
+        msgs.push_back(std::move(u));
+
+        /* hash an empty dir, then add a file and re-check */
+        std::string ws = "/tmp/opencode_mem_ws2";
+        ::system(("rm -rf " + ws + " && mkdir -p " + ws).c_str());
+        std::string h1;
+        CHECK(opencode::memory::workspace_hash(ws, h1).ok());
+        CHECK(opencode::memory::checkpoint(mem.get(), sess, msgs, 5, {}, h1) ==
+              sess);
+
+        /* workspace changed while offline: hash must differ */
+        ::system(("echo 'x' > " + ws + "/extra.txt").c_str());
+        opencode::memory::SessionCheckpoint r =
+            opencode::memory::resume(mem.get(), sess, ws);
+        CHECK(r.found);
+        CHECK(!r.workspace_matches);
+        CHECK(r.messages.size() == 1);
+    }
+
+    /* ---- workspace_hash determinism + change sensitivity ---- */
+    {
+        std::string ws = "/tmp/opencode_mem_ws3";
+        ::system(("rm -rf " + ws + " && mkdir -p " + ws).c_str());
+        std::string h1, h2;
+        CHECK(opencode::memory::workspace_hash(ws, h1).ok());
+        CHECK(opencode::memory::workspace_hash(ws, h2).ok());
+        CHECK(h1 == h2);
+        CHECK(!h1.empty());
+
+        ::system(("printf 'a\\n' > " + ws + "/a.txt").c_str());
+        ::system(("printf 'b\\n' > " + ws + "/b.txt").c_str());
+        std::string h3;
+        CHECK(opencode::memory::workspace_hash(ws, h3).ok());
+        CHECK(h3 != h1);
+
+        /* order-independence: re-write the same bytes */
+        ::system(("printf 'b\\n' > " + ws + "/b.txt").c_str());
+        std::string h4;
+        CHECK(opencode::memory::workspace_hash(ws, h4).ok());
+        CHECK(h4 == h3);
+    }
+
+    /* ---- checkpoint is a no-op without a store ---- */
+    {
+        const std::string saved = opencode::memory::checkpoint(
+            nullptr, "sess-x", {}, 0, {}, "");
+        CHECK(saved.empty());
+        opencode::memory::SessionCheckpoint r =
+            opencode::memory::resume(nullptr, "sess-x", "/tmp");
+        CHECK(!r.found);
     }
 
     if (failures == 0) std::printf("memory_test: all OK\n");

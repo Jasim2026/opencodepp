@@ -330,6 +330,26 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   to the process CWD → `e_invalid_cfg` (VALIDATION) from a subdir. All hosts
   that need the default templates (CLI e2e, ABI test, Java harness) must run
   from the repo root; bindings that embed a `prompt_dir` are immune.
+## Phase 13 lessons
+
+- **Do not compare a short-lived child's RSS min vs max for a "leak" signal
+  under ASan.** The first 100 ms sample is taken before ASan touches its
+  shadow map, so min ≈ 14 MB and mid-run max ≈ 71 MB every time → false
+  "UNBOUNDED GROWTH" on all three ASan CI presets. Each soak task is a fresh
+  process; the meaningful signal is the end-of-task RSS footprint across
+  tasks (steady state), which is what `soak` now gates on.
+- **A 5 s subprocess timeout in a read-only probe is a flake magnet on a
+  loaded CI runner.** `tools_test` `git.diff` failed only in the release
+  preset, only once, while dev/net/store were green. Read-only probes that
+  are safe to repeat (git status/diff/show/branch) get one retry + 10 s;
+  probes that fail for a real reason still fail.
+- **Instrumentation overhead must be excluded from size budgets.** ASan dev
+  binaries are > 15 MB while the stripped `-Os` CLI is 1.84 MB; the size
+  assertion is therefore gated on `--size-limit > 0` (CMake sets 15 only for
+  `-Os`, else 0 = informational).
+- **Fuzz with a seed.** `tests/fuzz_test.cpp` is deterministic per seed, so
+  a CI failure is reproducible (`--seed N --iters 5000`), and 5k iters is
+  still ~0.5 s — cheap enough to run locally between every Phase 14 change.
 
 ---
 

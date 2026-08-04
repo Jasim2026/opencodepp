@@ -1,0 +1,21 @@
+{
+  "tool": "measure",
+  "version": "0.13.0",
+  "abi": 1,
+  "ok": true,
+  "engine_init_ms": 14.940,
+  "rss_before_kb": 3184,
+  "rss_after_kb": 3184,
+  "cli_binary_bytes": 1839432,
+  "budgets": [
+    {"name":"engine_init","min_us":14940.3,"target_ms":100.0,"pass":true},
+    {"name":"rss_idle_delta_kb","min_us":0.0,"target_ms":10240.0,"pass":true},
+    {"name":"intent_classify","min_us":9.0,"target_ms":1.0,"pass":true},
+    {"name":"context_assembly","min_us":71.2,"target_ms":10.0,"pass":true},
+    {"name":"tool_dispatch","min_us":0.1,"target_ms":5.0,"pass":true},
+    {"name":"verify_gate","min_us":12.6,"target_ms":50.0,"pass":true},
+    {"name":"event_emit","min_us":0.1,"target_ms":1.0,"pass":true},
+    {"name":"rss_active_delta_kb","min_us":0.0,"target_ms":30720.0,"pass":true},
+    {"name":"cli_binary_bytes","min_us":1839432.0,"target_ms":15728640.0,"pass":true}
+  ]
+}

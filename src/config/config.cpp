@@ -258,6 +258,35 @@ core::error_code load_config_json(std::string_view text, Config& out,
     }
     if (c.failed()) return c.err;
 
+    if (const JVal* m = root.find("memory"); m) {
+        if (m->kind != JVal::Kind::object) {
+            c.invalid("memory", "expected object");
+        } else {
+            int64_t v = 0;
+            if (get_int(*m, "max_value_chars", "memory.max_value_chars",
+                        1, 100'000, v, c)) {
+                out.memory.max_value_chars = static_cast<uint32_t>(v);
+            }
+            if (get_int(*m, "max_key_chars", "memory.max_key_chars",
+                        1, 1'000, v, c)) {
+                out.memory.max_key_chars = static_cast<uint32_t>(v);
+            }
+            if (get_int(*m, "max_entries", "memory.max_entries",
+                        1, 1'000'000, v, c)) {
+                out.memory.max_entries = static_cast<uint32_t>(v);
+            }
+            if (get_int(*m, "max_entries_per_task", "memory.max_entries_per_task",
+                        1, 1'000, v, c)) {
+                out.memory.max_entries_per_task = static_cast<uint32_t>(v);
+            }
+            if (get_int(*m, "max_entry_tokens", "memory.max_entry_tokens",
+                        1, 100'000, v, c)) {
+                out.memory.max_entry_tokens = static_cast<uint32_t>(v);
+            }
+        }
+    }
+    if (c.failed()) return c.err;
+
     std::string tmp;
     if (get_str(root, "data_dir", "data_dir", tmp, false, c)) {
         out.data_dir = std::move(tmp);
@@ -288,7 +317,7 @@ core::error_code load_config_json(std::string_view text, Config& out,
     if (c.failed()) return c.err;
 
     static constexpr std::string_view kKnown[] = {
-        "schema", "providers", "agents",      "network", "budget",
+        "schema", "providers", "agents",      "network", "budget", "memory",
         "data_dir", "context_paths", "edge_mode"};
     for (const auto& [k, v] : root.obj) {
         (void)v;

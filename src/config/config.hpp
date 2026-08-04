@@ -51,11 +51,23 @@ struct BudgetCfg {
     uint32_t max_tokens_per_task = 12'000;
 };
 
+/* Phase 11 memory limits. Memory is a curated list, not a database: entries
+ * are capped in size and count, and only a small budgeted set is injected
+ * into any one context plan. */
+struct MemoryCfg {
+    uint32_t max_value_chars = 512;   /* per-entry value cap                */
+    uint32_t max_key_chars = 64;      /* per-entry key cap                  */
+    uint32_t max_entries = 64;        /* per-scope entry count cap          */
+    uint32_t max_entries_per_task = 6;   /* Tier-2 injection cap (T1)        */
+    uint32_t max_entry_tokens = 400;     /* Tier-2 injection token cap (T1)  */
+};
+
 struct Config {
     std::vector<ProviderCfg> providers;
     std::vector<AgentCfg> agents;
     NetworkCfg network;
     BudgetCfg budget;
+    MemoryCfg memory;
     std::string data_dir;
     std::vector<std::string> context_paths;
     bool edge_mode = false;

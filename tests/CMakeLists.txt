@@ -32,7 +32,8 @@ foreach(test
     verify_test
     verify_golden_test
     agent_states_test
-    agent_loop_test)
+    agent_loop_test
+    memory_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})

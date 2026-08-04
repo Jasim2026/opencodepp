@@ -20,6 +20,13 @@ production code as TODO stubs. Checkpoint reports reference this file by section
 
 ## Debugging lessons
 
+- **This edge device is a midrange phone (low RAM); heavy builds crash it.** Never run
+  `ninja`/`cmake --build` (parallel, RAM-heavy) locally. Local verification is light-only: compile
+  individual TUs with plain `g++ -std=c++20 -I src -I include -I . -Wall -Wextra -Werror -c`,
+  then link a single test binary with `g++ ... -o` (a one-shot link is OK). Delegate ALL full builds
+  (dev/release/size/ctest matrix) to GitHub Actions CI; commit/push then `gh run watch` is the
+  authoritative build+test run. The local cmake build dir in `/tmp/opencode/cmake-dev` was a one-off
+  sanity check; do not rebuild it here.
 - **ASan cannot run in the proot sandbox** (local box): ASan fails to mmap its
   shadow memory (`heap size exceeds max user virtual address`). Symptom: test
   binary crashes with `AddressSanitizer: CHECK failed`. Fix: run local sanity

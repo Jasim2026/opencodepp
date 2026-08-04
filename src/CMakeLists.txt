@@ -46,6 +46,7 @@ set(OPENCODE_CORE_SOURCES
   prompt/context.cpp
   prompt/registry.cpp
   store/mem_store.cpp
+  tools/schema.cpp
   util/base64.cpp
   util/json.cpp
   util/sha1.cpp)

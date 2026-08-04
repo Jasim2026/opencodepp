@@ -3,9 +3,9 @@
  *
  * load_templates() compiles every *.md under src/prompt/templates/ at startup
  * (tests and tools point it at the source tree). tools_schema_json() projects
- * our ToolSpec set onto a provider wire family's native `tools` array using the
- * exact shapes the Phase 5 adapters serialize, so token estimates and the
- * golden fixtures agree. Never throws.
+ * our ToolSpec set onto a provider wire family's native `tools` array by
+ * delegating to tools::schema (Phase 8's single source of truth), so token
+ * estimates and the golden fixtures agree. Never throws.
  */
 #include "prompt/registry.h"
 
@@ -16,11 +16,9 @@
 #include <vector>
 
 #include "prompt/compiler.h"
-#include "util/json.h"
+#include "tools/schema.h"
 
 namespace opencode::prompt {
-
-using opencode::util::JVal;
 
 core::error_code PromptRegistry::add(PromptRef p) {
     for (PromptRef& have : refs_) {
@@ -69,68 +67,25 @@ core::error_code load_templates(std::string_view dir, PromptRegistry& out) {
     return core::ok();
 }
 
-namespace {
-
-core::error_code parse_schema(std::string_view schema_json, JVal& out) {
-    if (schema_json.empty()) {
-        out = JVal::Object({});
-        return core::ok();
-    }
-    return parse_json(schema_json, out);
-}
-
-} /* namespace */
-
 core::error_code tools_schema_json(const provider::ToolsSpec& tools,
                                    std::string_view wire_family,
                                    std::string& out) {
-    if (wire_family == "anthropic") {
-        std::vector<JVal> list;
-        for (const provider::ToolSpec& t : tools) {
-            JVal schema;
-            if (const core::error_code c = parse_schema(t.input_schema_json, schema);
-                !c.ok())
-                return c;
-            list.push_back(JVal::Object(
-                {{"name", JVal::Str(t.name)},
-                 {"description", JVal::Str(t.description)},
-                 {"input_schema", std::move(schema)}}));
-        }
-        out = util::to_json(JVal::Array(std::move(list)));
-        return core::ok();
-    }
-    if (wire_family == "google") {
-        std::vector<JVal> decls;
-        for (const provider::ToolSpec& t : tools) {
-            JVal params;
-            if (const core::error_code c = parse_schema(t.input_schema_json, params);
-                !c.ok())
-                return c;
-            decls.push_back(JVal::Object(
-                {{"name", JVal::Str(t.name)},
-                 {"description", JVal::Str(t.description)},
-                 {"parameters", std::move(params)}}));
-        }
-        out = util::to_json(JVal::Array(
-            std::vector<JVal>{JVal::Object(
-                {{"functionDeclarations", JVal::Array(std::move(decls))}})}));
-        return core::ok();
-    }
-    /* default: openai family (incl. openai_compat) */
-    std::vector<JVal> list;
+    /* Delegate to tools::schema -- the one source of truth for the provider
+     * projection (Phase 8). provider::ToolSpec carries its schema already, so
+     * the mapping is 1:1 and never fails. */
+    std::vector<tools::ToolSpec> specs;
+    specs.reserve(tools.size());
     for (const provider::ToolSpec& t : tools) {
-        JVal params;
-        if (const core::error_code c = parse_schema(t.input_schema_json, params);
-            !c.ok())
-            return c;
-        list.push_back(JVal::Object(
-            {{"type", JVal::Str("function")},
-             {"function",
-              JVal::Object({{"name", JVal::Str(t.name)},
-                            {"description", JVal::Str(t.description)},
-                            {"parameters", std::move(params)}})}}));
+        tools::ToolSpec s;
+        s.id = t.id;
+        s.name = t.name;
+        s.description = t.description;
+        s.params_schema = t.input_schema_json;
+        s.is_read_only = true;
+        s.category = tools::ToolCategory::read;
+        specs.push_back(std::move(s));
     }
-    out = util::to_json(JVal::Array(std::move(list)));
+    out = tools::schema::tools_json(specs, wire_family);
     return core::ok();
 }
 

@@ -224,6 +224,76 @@ jobs:
           ./build/dev/tools/soak --bin ./build/dev/tools/run_agent \
             --tasks 24 --fault-every 4 --task-timeout 60 --workspace /tmp/soak_ws
 
+  packaging:
+    name: install + find_package (scratch consumer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build pkg-config
+
+      - name: Configure & build (release)
+        run: |
+          cmake --preset release
+          cmake --build --preset release -j "$(nproc)"
+
+      - name: Install to a clean prefix
+        run: |
+          rm -rf /tmp/opencode-install
+          cmake --install build/release --prefix /tmp/opencode-install
+          ls -R /tmp/opencode-install
+
+      - name: pkg-config smoke
+        run: |
+          export PKG_CONFIG_PATH=/tmp/opencode-install/lib/pkgconfig
+          pkg-config --modversion opencodepp
+          pkg-config --cflags --libs opencodepp
+          pkg-config --cflags --libs opencodepp-static
+
+      - name: Scratch consumer via find_package(opencodepp CONFIG)
+        run: |
+          rm -rf /tmp/opencode-scratch
+          mkdir -p /tmp/opencode-scratch
+          cat > /tmp/opencode-scratch/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(opencodepp_consumer C CXX)
+          find_package(opencodepp CONFIG REQUIRED)
+          add_executable(embed_static main.c)
+          target_link_libraries(embed_static PRIVATE opencodepp::opencodepp_static)
+          add_executable(embed_shared main.c)
+          target_link_libraries(embed_shared PRIVATE opencodepp::opencodepp_shared)
+          EOF
+          cat > /tmp/opencode-scratch/main.c <<'EOF'
+          #include <opencode/opencode.h>
+          #include <stdio.h>
+          #include <string.h>
+          int main(void) {
+              opencode_engine_t* e = 0;
+              opencode_status_t st = opencode_engine_create(0, &e);
+              if (st != OPENCODE_OK || e == 0) return 1;
+              st = opencode_memory_write(e, OPENCODE_MEMORY_FACT,
+                                         "scratch.probe", "installed-ok", 0, 0, 0);
+              if (st != OPENCODE_OK) return 2;
+              char buf[256];
+              size_t n = 0;
+              st = opencode_memory_read(e, OPENCODE_MEMORY_FACT, "[]",
+                                        buf, sizeof buf, &n);
+              if (st != OPENCODE_OK) return 3;
+              if (strstr(buf, "installed-ok") == 0) return 4;
+              printf("abi=%u scratch consumer OK: %s\n", opencode_abi_version(), buf);
+              opencode_engine_destroy(e);
+              return 0;
+          }
+          EOF
+          cmake -S /tmp/opencode-scratch -B /tmp/opencode-scratch/build \
+            -DCMAKE_PREFIX_PATH=/tmp/opencode-install
+          cmake --build /tmp/opencode-scratch/build -j "$(nproc)"
+          /tmp/opencode-scratch/build/embed_static
+          LD_LIBRARY_PATH=/tmp/opencode-install/lib /tmp/opencode-scratch/build/embed_shared
+
   hygiene:
     name: source hygiene
     runs-on: ubuntu-latest

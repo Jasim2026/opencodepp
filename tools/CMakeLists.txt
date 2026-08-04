@@ -38,6 +38,9 @@ add_executable(opencode_cli opencode_cli.cpp)
 target_link_libraries(opencode_cli PRIVATE opencodepp_static)
 set_target_properties(opencode_cli PROPERTIES OUTPUT_NAME "opencodepp_cli")
 
+# The reference CLI ships in the install tree (bin/opencodepp_cli).
+install(TARGETS opencode_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # tools/measure -- Phase 13 T2 measurement + hardening gate. The binary-size
 # budget applies only to the stripped -Os build; other presets are
 # informational (dev builds carry ASan/debug overhead by design).

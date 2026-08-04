@@ -1,0 +1,12 @@
+# opencodepp.pc.in -- pkg-config entry for the shared library.
+prefix=${pcfiledir}/@OPENCODE_PC_TO_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: opencodepp
+Description: Hyper-efficient, embeddable C++ agentic-coding engine (libopencodepp)
+Version: @PROJECT_VERSION@
+Requires.private: @OPENCODE_PKG_PRIVATE_LIBS@
+Libs: -L${libdir} -lopencodepp
+Cflags: -I${includedir}

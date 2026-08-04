@@ -1,0 +1,29 @@
+# opencodeppConfig.cmake.in -- package config for find_package(opencodepp CONFIG).
+#
+# The exported targets are:
+#   opencodepp::opencodepp_static  -- embed this when you want zero dlopen and
+#                                     full link-time stripping (-Os friendly)
+#   opencodepp::opencodepp_shared  -- pick this for plugin/dlopen scenarios
+#
+# The frozen public header installs to <prefix>/include/opencode/opencode.h;
+# the engine internals are NOT installed (they may change freely between
+# releases -- see docs/ABI.md).
+#
+# Feature flags record which optional backends the installed library was
+# built with (04_DEPENDENCY_POLICY.md: every third-party dep is optional,
+# OFF by default). The exported targets already carry the needed link
+# libraries for enabled features, so consumers usually need nothing extra.
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+include("${CMAKE_CURRENT_LIST_DIR}/opencodeppTargets.cmake")
+
+set(opencodepp_FEATURE_MBEDTLS       @OPENCODE_USE_MBEDTLS@)
+set(opencodepp_FEATURE_SQLITE        @OPENCODE_USE_SQLITE@)
+set(opencodepp_FEATURE_ZSTD          @OPENCODE_USE_ZSTD@)
+set(opencodepp_FEATURE_TREE_SITTER   @OPENCODE_USE_TREE_SITTER@)
+set(opencodepp_FEATURE_DOCTEST       @OPENCODE_USE_DOCTEST@)
+
+check_required_components(opencodepp)

@@ -102,6 +102,17 @@ endif()
 add_library(opencodepp_static STATIC $<TARGET_OBJECTS:opencodepp_core>)
 add_library(opencodepp_shared SHARED $<TARGET_OBJECTS:opencodepp_core>)
 set_target_properties(opencodepp_shared PROPERTIES OUTPUT_NAME opencodepp)
+set_target_properties(opencodepp_shared PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${OPENCODE_ABI_VERSION})
+add_library(opencodepp::opencodepp_static ALIAS opencodepp_static)
+add_library(opencodepp::opencodepp_shared ALIAS opencodepp_shared)
+
+# The engine uses std::thread (agent backoff), so consumers of the installed
+# package need the thread library too.
+find_package(Threads REQUIRED)
+target_link_libraries(opencodepp_static PUBLIC Threads::Threads)
+target_link_libraries(opencodepp_shared PUBLIC Threads::Threads)
 
 # The static/shared libs use $<TARGET_OBJECTS>, so the object lib's link usage
 # requirements do NOT propagate; link the optional backends explicitly here.
@@ -117,6 +128,15 @@ endif()
 foreach(tgt opencodepp_static opencodepp_shared)
   target_include_directories(${tgt} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_compile_options(${tgt} PRIVATE $<$<CONFIG:Debug>:${OPENCODE_DEV_COMPILE_OPTIONS}>)
 endforeach()
+
+# Install the exported library targets (config/pkg-config/header handled by
+# cmake/install.cmake at the root).
+install(TARGETS opencodepp_static opencodepp_shared
+  EXPORT opencodeppTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

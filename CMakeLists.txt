@@ -2,7 +2,13 @@
 # Dependency policy (see 04_DEPENDENCY_POLICY.md): stdlib-first; every third-party
 # dep is optional, OFF by default, isolated behind an interface in its own TU.
 cmake_minimum_required(VERSION 3.20)
-project(opencodepp VERSION 0.1.0 LANGUAGES C CXX)
+project(opencodepp VERSION 0.13.0 LANGUAGES C CXX)
+
+include(GNUInstallDirs)
+
+# Keep in sync with OPENCODE_ABI_VERSION in include/opencode/opencode.h.
+# Used for the shared library SOVERSION and the package config.
+set(OPENCODE_ABI_VERSION 1)
 
 # ---------------------------------------------------------------------------
 # Optional-backend switches (all OFF by default per 04_DEPENDENCY_POLICY.md Section 3).
@@ -64,6 +70,12 @@ add_subdirectory(bindings)
 if(OPENCODE_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
+
+# ---------------------------------------------------------------------------
+# Packaging: install/export rules (find_package(opencodepp CONFIG) +
+# pkg-config). Included last so every target exists for install(EXPORT).
+# ---------------------------------------------------------------------------
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/install.cmake)
 
 message(STATUS "opencodepp ${PROJECT_VERSION} configured "
                "(mbedtls=${OPENCODE_USE_MBEDTLS} tree_sitter=${OPENCODE_USE_TREE_SITTER} "

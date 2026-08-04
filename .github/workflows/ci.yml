@@ -141,10 +141,10 @@ jobs:
           sudo apt-get install -y -qq ninja-build
 
       - name: Configure
-        run: cmake --preset dev
+        run: cmake --preset release
 
       - name: Build shared library
-        run: cmake --build --preset dev -j "$(nproc)" --target opencodepp_shared
+        run: cmake --build --preset release -j "$(nproc)" --target opencodepp_shared
 
       - name: Run python binding test (needs libopencodepp.so)
         run: python3 bindings/python/tests/py_binding_test.py

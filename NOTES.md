@@ -197,6 +197,29 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   `char` to a function that takes `std::string_view`. GCC allows the implicit
   conversion but Clang (and CI `-Werror`) reject it. Always use `"/"` (string
   literal, implicitly `string_view`) not `'/'` (char).
+- **Phase 09 lessons:**
+  - **`for(;;)` double-semicolon false positive** — the double-semicolon
+    detector in `syntax.cpp` initially flagged `for(;;)` as a syntax error.
+    Fix: when `;;` is encountered, check the delimiter stack for a preceding
+    `(` (for-loop header). If found, suppress the warning.
+  - **Unterminated string at EOF without newline** — the syntax scanner
+    tracked string state but only emitted "unterminated" when a `\n` was found
+    inside a string. At EOF without a trailing newline, the state was left
+    dangling. Fix: after the main loop, check if still in a string/comment
+    state and report accordingly.
+  - **Hidden Unicode in gate/syntax comments** — same issue as Phase 08:
+    `→` and `—` in comments cause CI source-hygiene failure. Always scan
+    new `.cpp` files for non-ASCII before committing.
+  - **Golden test "patch result mismatch" false accept** — the test fixture
+    had a patch that correctly produced the `after_content`, so the gate
+    correctly passed it. Fix: change the patch to produce wrong output.
+  - **Golden test "patch replace multiple" false reject** — the minimal-diff
+    heuristic in `diff.cpp` flags >80% line churn for small edits (<20 lines).
+    A 3-line file with all 3 lines changed triggered it. Fix: expand the
+    fixture to 21 lines to bypass the threshold.
+  - **GateResult aggregate init** — `GateResult{Stage::syntax, true, ok(), ""}`
+    triggers `-Wmissing-field-initializers` because `line`, `col`, and `file`
+    are omitted. Fix: provide all fields explicitly.
 
 ---
 

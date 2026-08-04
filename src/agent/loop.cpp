@@ -33,6 +33,7 @@
 #include "agent/intent.h"
 #include "core/clock.h"
 #include "memory/session_memory.h"
+#include "memory/summarizer.h"
 #include "memory/workspace_memory.h"
 #include "net/http1.h"
 #include "net/socket.h"
@@ -168,6 +169,25 @@ core::error_code Agent::assemble(const IntentPlan& plan, provider::MsgList& msgs
     prompt::ContextInput in;
     in.registry = opts_.prompt;
     in.messages = &session_.messages();
+
+    /* Lossy fold when history exceeds the context cap: replace the oldest
+     * turns with one Summary message (local fold; the engine does not spend
+     * an extra in-budget call here). The loss is surfaced as a "fold" event,
+     * never silent truncation. */
+    memory::FoldResult fold_holder;
+    const std::size_t keep_recent = 4;
+    if (memory::needs_fold(session_.messages(), model.context_window,
+                           model.default_max_tokens, keep_recent)) {
+        fold_holder = memory::fold_oldest(
+            session_.messages(), model.context_window,
+            model.default_max_tokens, keep_recent);
+        if (fold_holder.folded) {
+            in.messages = &fold_holder.messages;
+            session_.emit("fold", fold_holder.event_what + ": " +
+                                      fold_holder.event_reason);
+        }
+    }
+
     in.tools = &tools;
     in.wire_family = model.api_family;
     in.edge_mode = (plan.budget_profile == "minimal");

@@ -28,6 +28,7 @@ set(OPENCODE_CORE_SOURCES
   graph/symbols.cpp
   memory/entry.cpp
   memory/session_memory.cpp
+  memory/summarizer.cpp
   memory/workspace_memory.cpp
   msg/codec.cpp
   msg/message.cpp

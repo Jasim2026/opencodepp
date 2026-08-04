@@ -16,6 +16,7 @@
 #include "config/config.hpp"
 #include "memory/entry.h"
 #include "memory/session_memory.h"
+#include "memory/summarizer.h"
 #include "memory/workspace_memory.h"
 #include "msg/message.h"
 #include "store/mem_store.hpp"
@@ -476,6 +477,106 @@ int main() {
         opts.store = mem.get();
         CHECK(opencode::tools::register_defaults(reg, opts).ok());
         CHECK(reg.find("memory.write") != nullptr);
+    }
+
+    /* ---- summarizer: deterministic local fold ---- */
+    {
+        std::vector<opencode::msg::Message> msgs;
+        for (int i = 0; i < 10; ++i) {
+            opencode::msg::Message m;
+            m.id = "m" + std::to_string(i);
+            m.role = (i % 2 == 0) ? opencode::msg::Role::user
+                                  : opencode::msg::Role::assistant;
+            m.parts.push_back(opencode::msg::Text{
+                "line one of turn " + std::to_string(i) + "\n" +
+                "line two of turn " + std::to_string(i) + "\n" +
+                "line three of turn " + std::to_string(i)});
+            msgs.push_back(std::move(m));
+        }
+
+        /* with a tiny context window, the fold triggers */
+        CHECK(opencode::memory::needs_fold(msgs, 100, 64, 4));
+        /* with a huge window there is nothing to fold */
+        CHECK(!opencode::memory::needs_fold(msgs, 1 << 20, 64, 4));
+        /* at most keep_recent messages -> no fold */
+        CHECK(!opencode::memory::needs_fold(
+            std::vector<opencode::msg::Message>(msgs.begin(),
+                                                msgs.begin() + 3),
+            100, 64, 4));
+
+        const opencode::memory::FoldResult r =
+            opencode::memory::fold_oldest(msgs, 100, 64, 4);
+        CHECK(r.folded);
+        CHECK(r.folded_count == 6);
+        CHECK(r.event_what.find("6 messages") != std::string::npos);
+        CHECK(!r.event_reason.empty());
+        CHECK(r.messages.size() == 1 + 4);
+        CHECK(r.messages[0].role == opencode::msg::Role::user);
+        CHECK(r.messages[0].content_text().find(
+                  "[summary of earlier turns]") == 0);
+        CHECK(r.messages[0].content_text().find("outcome:") !=
+              std::string::npos);
+        /* deterministic: two folds produce identical text */
+        const opencode::memory::FoldResult r2 =
+            opencode::memory::fold_oldest(msgs, 400, 64, 4);
+        CHECK(r.messages[0].content_text() ==
+              r2.messages[0].content_text());
+    }
+
+    /* ---- summarizer: LLM fold + loss visible ---- */
+    {
+        std::vector<opencode::msg::Message> msgs;
+        for (int i = 0; i < 8; ++i) {
+            opencode::msg::Message m;
+            m.id = "m" + std::to_string(i);
+            m.role = opencode::msg::Role::user;
+            m.parts.push_back(opencode::msg::Text{"turn " + std::to_string(i)});
+            msgs.push_back(std::move(m));
+        }
+        bool llm_called = false;
+        opencode::memory::SummaryFn fn =
+            [&](const std::vector<opencode::msg::Message>& folded,
+                std::string_view local) {
+                llm_called = true;
+                CHECK(folded.size() == 4);
+                CHECK(!local.empty());
+                return std::string("LLM summary");
+            };
+        const opencode::memory::FoldResult r =
+            opencode::memory::fold_oldest(msgs, 500, 64, 4, fn);
+        CHECK(r.folded);
+        CHECK(llm_called);
+        CHECK(r.messages[0].content_text().find("LLM summary") !=
+              std::string::npos);
+        CHECK(r.event_reason == "LLM fold");
+
+        /* an LLM that returns "" falls back to the local fold */
+        bool called = false;
+        opencode::memory::SummaryFn empty_fn =
+            [&](const std::vector<opencode::msg::Message>&,
+                std::string_view) {
+                called = true;
+                return std::string();
+            };
+        const opencode::memory::FoldResult r2 =
+            opencode::memory::fold_oldest(msgs, 500, 64, 4, empty_fn);
+        CHECK(called);
+        CHECK(r2.messages[0].content_text().find("[summary") !=
+              std::string::npos);
+    }
+
+    /* ---- summarizer: no fold when history is short ---- */
+    {
+        std::vector<opencode::msg::Message> msgs;
+        opencode::msg::Message m;
+        m.id = "only";
+        m.role = opencode::msg::Role::user;
+        m.parts.push_back(opencode::msg::Text{"hi"});
+        msgs.push_back(std::move(m));
+        const opencode::memory::FoldResult r =
+            opencode::memory::fold_oldest(msgs, 400, 64, 4);
+        CHECK(!r.folded);
+        CHECK(r.messages.empty());
     }
 
     if (failures == 0) std::printf("memory_test: all OK\n");

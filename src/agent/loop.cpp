@@ -33,12 +33,14 @@
 #include "agent/intent.h"
 #include "core/clock.h"
 #include "memory/session_memory.h"
+#include "memory/workspace_memory.h"
 #include "net/http1.h"
 #include "net/socket.h"
 #include "net/sse.h"
 #include "net/transport.h"
 #include "prompt/context.h"
 #include "util/json.h"
+#include "util/sha1.h"
 
 namespace opencode::agent {
 
@@ -122,6 +124,36 @@ void Agent::checkpoint(const std::vector<std::string>& applied_edits) {
     session_.emit("checkpoint", session_.id());
 }
 
+void Agent::write_task_lesson(std::string_view summary, const IntentPlan& plan) {
+    if (session_.store() == nullptr) return;
+    memory::Entry e;
+    e.kind = memory::Kind::lesson;
+    e.key = "lesson_" + util::sha1_hex(user_input_).substr(0, 8);
+    e.value = summary.empty()
+                  ? std::string("task done, intent ") +
+                        std::string(to_string(plan.intent))
+                  : std::string(summary);
+    e.source = "engine:task_done";
+    e.tags = {std::string(to_string(plan.intent)), "task"};
+    e.created_at = core::now_wall_sec();
+    (void)memory::write_entry(session_.store(), session_.workspace(), std::move(e),
+                              session_.config().memory);
+}
+
+void Agent::write_repo_rule(std::string_view tool_name) {
+    if (session_.store() == nullptr) return;
+    memory::Entry e;
+    e.kind = memory::Kind::repo_rule;
+    e.key = "rule_" + std::string(tool_name);
+    e.value = "permission denied: " + std::string(tool_name) +
+              " is not allowed in this workspace";
+    e.source = "engine:permission_denied";
+    e.tags = {std::string(tool_name), "permission"};
+    e.created_at = core::now_wall_sec();
+    (void)memory::write_entry(session_.store(), session_.workspace(), std::move(e),
+                              session_.config().memory);
+}
+
 core::error_code Agent::assemble(const IntentPlan& plan, provider::MsgList& msgs,
                                  provider::ToolsSpec& tools,
                                  provider::Budget& budget) {
@@ -144,6 +176,20 @@ core::error_code Agent::assemble(const IntentPlan& plan, provider::MsgList& msgs
     in.hard_cap_tokens = cfg.budget.max_tokens_per_task;
     in.available_tokens =
         static_cast<std::uint32_t>(session_.budget_remaining());
+
+    /* Tier-2 workspace memory: keyword-scoped entries, budget-bounded by
+     * MemoryCfg (max_entries_per_task / max_entry_tokens). Never scored. */
+    if (session_.store() != nullptr && !user_input_.empty()) {
+        const config::MemoryCfg& mem = cfg.memory;
+        const std::vector<std::string> keywords =
+            memory::keywords_from_text(user_input_);
+        const std::string ctx = memory::entries_to_context(
+            memory::match_entries(session_.store(), session_.workspace(),
+                                  keywords, mem),
+            mem.max_entries_per_task, mem.max_entry_tokens,
+            mem.max_value_chars);
+        if (!ctx.empty()) in.env.push_back({"memory", ctx});
+    }
 
     prompt::ContextPlan plan_out;
     const core::error_code ec = prompt::assemble_context(in, plan_out);
@@ -477,22 +523,25 @@ tools::ToolResult Agent::run_tool(const provider::ToolCallDone& call,
 
         session_.set_state(AgentState::applying);
         session_.emit("apply", call.name);
-        r = opts_.permission->run(*opts_.tools, call.name, inv, ctx);
-        if (r.status == tools::ToolStatus::ok) {
-            applied_edits.push_back(
-                prop.path.empty() ? call.name : prop.path + " (" + call.name + ")");
-        } else if (r.status == tools::ToolStatus::error) {
-            feedback_out = tool_error_text(r);
-        }
-        return r;
+    r = opts_.permission->run(*opts_.tools, call.name, inv, ctx);
+    if (r.status == tools::ToolStatus::ok) {
+        applied_edits.push_back(
+            prop.path.empty() ? call.name : prop.path + " (" + call.name + ")");
+    } else if (r.status == tools::ToolStatus::error) {
+        feedback_out = tool_error_text(r);
+        if (r.content == "permission_denied") write_repo_rule(call.name);
     }
+    return r;
+}
 
     r = opts_.permission->run(*opts_.tools, call.name, inv, ctx);
     if (r.status != tools::ToolStatus::ok) {
-        if (r.content == "permission_denied")
+        if (r.content == "permission_denied") {
             feedback_out = permission_text(call.name);
-        else
+            write_repo_rule(call.name);
+        } else {
             feedback_out = tool_error_text(r);
+        }
     }
     return r;
 }
@@ -512,6 +561,7 @@ DriveResult Agent::drive(std::string_view user_input) {
 
     feedback_seen_.clear();
     aborted_by_feedback_ = false;
+    user_input_ = std::string(user_input);
 
     session_.set_state(AgentState::preparing);
     session_.emit("intent", "classifying");
@@ -641,6 +691,7 @@ DriveResult Agent::drive(std::string_view user_input) {
             session_.set_state(AgentState::done);
             session_.emit("done", "summary");
         }
+        write_task_lesson(result.summary, plan);
     } else {
         session_.set_state(AgentState::error);
         session_.emit("error", std::string(result.ec.message()),

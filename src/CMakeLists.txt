@@ -28,6 +28,7 @@ set(OPENCODE_CORE_SOURCES
   graph/symbols.cpp
   memory/entry.cpp
   memory/session_memory.cpp
+  memory/workspace_memory.cpp
   msg/codec.cpp
   msg/message.cpp
   msg/tokens.cpp
@@ -57,6 +58,7 @@ set(OPENCODE_CORE_SOURCES
   tools/exec/shell.cpp
   tools/exec/util.cpp
   tools/exec/write.cpp
+  tools/memory_tool.cpp
   tools/permission.cpp
   tools/registry.cpp
   tools/schema.cpp

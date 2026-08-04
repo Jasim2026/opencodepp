@@ -70,6 +70,8 @@ public:
     bool get_string(std::string_view key, std::string& out) const;
     bool get_int(std::string_view key, int64_t& out) const;
     bool get_bool(std::string_view key, bool& out) const;
+    bool get_string_array(std::string_view key,
+                          std::vector<std::string>& out) const;
 
 private:
     util::JVal root_;

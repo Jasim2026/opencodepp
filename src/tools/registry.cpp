@@ -10,6 +10,7 @@
 #include "tools/exec/read_only.h"
 #include "tools/exec/shell.h"
 #include "tools/exec/write.h"
+#include "tools/memory_tool.h"
 
 namespace opencode::tools {
 
@@ -76,6 +77,13 @@ core::error_code register_defaults(ToolRegistry& reg,
             return c;
         if (const core::error_code c =
                 exec::make_shell_tool(opts.workspace, tools);
+            !c.ok())
+            return c;
+    }
+    if (opts.store != nullptr) {
+        if (const core::error_code c =
+                make_memory_tools(opts.store, opts.workspace,
+                                  opts.memory_cfg, tools);
             !c.ok())
             return c;
     }

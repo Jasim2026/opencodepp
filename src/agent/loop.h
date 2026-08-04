@@ -113,6 +113,11 @@ private:
     core::error_code assemble(const IntentPlan& plan, provider::MsgList& msgs,
                               provider::ToolsSpec& tools, provider::Budget& budget);
 
+    /* Engine-side memory writes: a one-line Lesson at task done, a one-line
+     * RepoRule when the gate denies a tool. Best-effort, no-op without Store. */
+    void write_task_lesson(std::string_view summary, const IntentPlan& plan);
+    void write_repo_rule(std::string_view tool_name);
+
     Session& session_;
     LoopOptions opts_;
     std::atomic<bool> cancel_{false};
@@ -120,6 +125,7 @@ private:
     /* Dedupe keys for gate feedback seen this task (loop aborts on repeats). */
     std::vector<std::string> feedback_seen_;
     bool aborted_by_feedback_ = false;
+    std::string user_input_;  /* current task text (drives memory matching) */
 };
 
 } /* namespace opencode::agent */

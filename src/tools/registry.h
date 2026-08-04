@@ -16,8 +16,13 @@
 #include "core/error.h"
 #include "tools/tool.h"
 
+#include "config/config.hpp"
+
 namespace opencode::graph {
 class SymbolIndex;
+}
+namespace opencode::store {
+class Store;
 }
 
 namespace opencode::tools {
@@ -47,6 +52,8 @@ struct RegistryOptions {
     std::string workspace;
     graph::SymbolIndex* graph = nullptr;
     bool include_write = true;
+    store::Store* store = nullptr;           /* enables the memory.write tool */
+    config::MemoryCfg memory_cfg;            /* caps for memory.write         */
 };
 core::error_code register_defaults(ToolRegistry& reg,
                                    const RegistryOptions& opts);

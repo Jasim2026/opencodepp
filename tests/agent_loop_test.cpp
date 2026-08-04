@@ -6,6 +6,8 @@
  *   B. read-tool round (file.read then final text)
  *   C. write round through the verify gate (file actually created)
  *   D. provider-level error over a clean 200 ({"error":{...}} frame)
+ *   E. memory hooks with a Store attached: memory.write tool round persists a
+ *      workspace entry and the engine writes a Lesson at task done
  *
  * No real network is used; the server binds 127.0.0.1 on an ephemeral port.
  * Runs from the repo root (see tests/CMakeLists.txt).
@@ -28,8 +30,11 @@
 #include "agent/loop.h"
 #include "agent/session.h"
 #include "core/event_loop.h"
+#include "memory/workspace_memory.h"
 #include "prompt/registry.h"
 #include "provider/provider.h"
+#include "store/mem_store.hpp"
+#include "tools/memory_tool.h"
 #include "tools/permission.h"
 #include "tools/registry.h"
 #include "verify/gate.h"
@@ -195,8 +200,8 @@ struct Rig {
             }
         }
         CHECK(loaded);
-        CHECK(tools::register_defaults(reg, {ws, nullptr, true}).ok());
-        vctx.workspace_root = ws;
+        CHECK(tools::register_defaults(reg, {ws, nullptr, true, nullptr, {}})
+                  .ok());        vctx.workspace_root = ws;
     }
 
     agent::LoopOptions opts() {
@@ -343,6 +348,88 @@ int main() {
         CHECK(r.iterations == 0);
         CHECK(r.applied_edits.empty());
         std::printf("  loop D (provider error): OK\n");
+    }
+
+    /* ---- scenario E: memory hooks with a Store attached ---- */
+    {
+        auto mem = opencode::store::create_mem_store();
+        auto srv = start_server([](int i) {
+            if (i == 0)
+                return sse_resp({
+                    "{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_3\",\"function\":{\"name\":\"memory.write\",\"arguments\":\"{\\\"key\\\":\\\"build_tool\\\",\\\"value\\\":\\\"cmake\\\",\\\"kind\\\":\\\"fact\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
+                    "{\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":8}}",
+                });
+            return sse_resp({
+                "{\"choices\":[{\"delta\":{\"content\":\"remembered\"},\"finish_reason\":null}]}",
+                "{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+                "{\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":2}}",
+            });
+        });
+        Rig fx(srv.port, ws, tools::Policy::allow);
+        std::vector<std::unique_ptr<tools::Tool>> mt;
+        CHECK(tools::make_memory_tools(mem.get(), ws, fx.cfg.memory, mt).ok());
+        CHECK(fx.reg.add(std::move(mt[0])).ok());
+
+        agent::SessionOptions sopts;
+        CHECK(agent::session_options_from_config(fx.cfg, "default", ws, sopts).ok());
+        sopts.store = mem.get();
+        agent::Session session(sopts);
+        agent::Agent a(session, fx.opts());
+        const agent::DriveResult r = a.drive("remember that the build uses cmake");
+        CHECK(r.ec.ok());
+        CHECK(r.iterations == 2);
+
+        /* memory.write tool persisted a workspace entry */
+        const std::vector<memory::Entry> ws_entries =
+            memory::read_entries(mem.get(), ws, fx.cfg.memory);
+        bool saw_tool_entry = false;
+        for (const memory::Entry& e : ws_entries)
+            if (e.key == "build_tool" && e.value == "cmake") saw_tool_entry = true;
+        CHECK(saw_tool_entry);
+
+        /* the engine wrote a Lesson at task done */
+        bool saw_lesson = false;
+        for (const memory::Entry& e : ws_entries)
+            if (e.kind == memory::Kind::lesson &&
+                e.key.rfind("lesson_", 0) == 0)
+                saw_lesson = true;
+        CHECK(saw_lesson);
+        std::printf("  loop E (memory hooks): OK\n");
+    }
+
+    /* ---- scenario F: permission denied writes a RepoRule ---- */
+    {
+        auto mem = opencode::store::create_mem_store();
+        auto srv = start_server([](int i) {
+            if (i == 0)
+                return sse_resp({
+                    "{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_4\",\"function\":{\"name\":\"file.write\",\"arguments\":\"{\\\"path\\\":\\\"x.txt\\\",\\\"content\\\":\\\"x\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}",
+                    "{\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":8}}",
+                });
+            return sse_resp({
+                "{\"choices\":[{\"delta\":{\"content\":\"blocked\"},\"finish_reason\":null}]}",
+                "{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+                "{\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":2}}",
+            });
+        });
+        Rig fx(srv.port, ws, tools::Policy::deny);
+        agent::SessionOptions sopts;
+        CHECK(agent::session_options_from_config(fx.cfg, "default", ws, sopts).ok());
+        sopts.store = mem.get();
+        agent::Session session(sopts);
+        agent::Agent a(session, fx.opts());
+        const agent::DriveResult r = a.drive("write x.txt");
+        CHECK(r.ec.ok());
+        CHECK(r.feedback.size() == 1);
+
+        bool saw_rule = false;
+        for (const memory::Entry& e :
+             memory::read_entries(mem.get(), ws, fx.cfg.memory))
+            if (e.kind == memory::Kind::repo_rule &&
+                e.key == "rule_file.write")
+                saw_rule = true;
+        CHECK(saw_rule);
+        std::printf("  loop F (repo-rule hook): OK\n");
     }
 
     if (failures == 0) std::printf("agent_loop_test: all OK\n");

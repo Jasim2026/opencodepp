@@ -275,6 +275,18 @@ bool ArgReader::get_bool(std::string_view key, bool& out) const {
     return true;
 }
 
+bool ArgReader::get_string_array(std::string_view key,
+                                 std::vector<std::string>& out) const {
+    const util::JVal* v = root_.find(key);
+    if (!v || v->kind != util::JVal::Kind::array) return false;
+    out.clear();
+    for (const util::JVal& item : v->arr) {
+        if (item.kind != util::JVal::Kind::string) return false;
+        out.emplace_back(item.str);
+    }
+    return true;
+}
+
 std::string sym_to_json(std::string_view kind, std::string_view name,
                         std::string_view qual, std::string_view file,
                         std::int64_t line) {

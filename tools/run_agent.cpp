@@ -211,9 +211,15 @@ int run(const Args& a) {
         return 1;
     }
 
+    agent::Session session(sopts);
+    session.set_event_fn(on_event, nullptr);
+    core::EventLoop loop;
+
     tools::ToolRegistry reg;
     if (const core::error_code ec =
-            tools::register_defaults(reg, {a.workspace, nullptr, true});
+            tools::register_defaults(reg,
+                                     {a.workspace, nullptr, true, session.store(),
+                                      cfg.memory});
         !ec.ok()) {
         std::fprintf(stderr, "run_agent: tool registration failed: %d\n",
                      static_cast<int>(ec.code()));
@@ -224,9 +230,6 @@ int run(const Args& a) {
     verify::Context vctx;
     vctx.workspace_root = a.workspace;
 
-    agent::Session session(sopts);
-    session.set_event_fn(on_event, nullptr);
-    core::EventLoop loop;
     agent::LoopOptions lo;
     lo.loop = &loop;
     lo.prompt = &prompts;

@@ -59,13 +59,13 @@ void emit_hunk(const Hunk& h, std::string& out) {
                      * it was removed rather than being a context/removed pair
                      * that should be emitted together. */
                     (ni + 1 < h.new_body.size() && h.old_body[oi] == h.new_body[ni + 1]))) {
-            /* old line has no corresponding new line at this position → removed */
+            /* old line has no corresponding new line at this position - removed */
             out.push_back('-');
             out += h.old_body[oi];
             out.push_back('\n');
             ++oi;
         } else if (ni < h.new_body.size()) {
-            /* new line with no corresponding old line → added */
+            /* new line with no corresponding old line - added */
             out.push_back('+');
             out += h.new_body[ni];
             out.push_back('\n');

@@ -9,6 +9,8 @@
 
 set(OPENCODE_CORE_SOURCES
   abi/version.cpp
+  agent/intent.cpp
+  agent/session.cpp
   config/config.cpp
   config/env_snapshot.cpp
   core/arena.cpp

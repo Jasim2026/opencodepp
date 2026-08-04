@@ -24,6 +24,9 @@ add_executable(run_agent run_agent.cpp)
 target_link_libraries(run_agent PRIVATE opencodepp_static)
 add_test(NAME run_agent_mock COMMAND run_agent --mock)
 
+add_executable(opencode_cli opencode_cli.cpp)
+target_link_libraries(opencode_cli PRIVATE opencodepp_static)
+
 # run_agent needs the prompt templates, so it runs from the repo root.
 set_tests_properties(run_agent_mock PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")

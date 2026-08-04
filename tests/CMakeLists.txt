@@ -73,6 +73,14 @@ add_test(NAME abi_test COMMAND abi_test)
 set_tests_properties(abi_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
+# cli_e2e_test drives the real opencode_cli binary as a subprocess against an
+# in-test multi-round SSE mock; needs prompt templates + workspace at repo root.
+add_executable(cli_e2e_test cli_e2e_test.cpp)
+target_link_libraries(cli_e2e_test PRIVATE opencodepp_static)
+add_test(NAME cli_e2e_test COMMAND cli_e2e_test $<TARGET_FILE:opencode_cli>)
+set_tests_properties(cli_e2e_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
 # permission_test runs from the repo root (same sandbox convention as tools_test).
 set_tests_properties(permission_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")

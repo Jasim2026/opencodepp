@@ -350,6 +350,73 @@ production code as TODO stubs. Checkpoint reports reference this file by section
 - **Fuzz with a seed.** `tests/fuzz_test.cpp` is deterministic per seed, so
   a CI failure is reproducible (`--seed N --iters 5000`), and 5k iters is
   still ~0.5 s — cheap enough to run locally between every Phase 14 change.
+## Phase 14 lessons (handover)
+
+### Decisions
+
+- **The installed package relocates.** `opencodepp{,-static}.pc` derive
+  `prefix` from `pcfiledir` (`file(RELATIVE_PATH)` + trailing-slash trim)
+  because `cmake --install --prefix` overrides the configured prefix — a
+  hardcoded `/usr/local` would break every staged install.
+- **`Threads::Threads` is PUBLIC** on both exported libs: the agent backoff
+  uses `std::thread` (`src/agent/loop.cpp`), so an installed static lib must
+  pull `-pthread` into the consumer. The config file calls
+  `find_dependency(Threads)`; exported `INTERFACE_LINK_LIBRARIES` carries the
+  optional-backend `-l` flags directly (plain names pass through to the link
+  line — no fragile `find_dependency` for mbedTLS/sqlite in the OFF-by-default
+  common path).
+- **`file(RELATIVE_PATH)` returns a trailing slash** when the target is the
+  parent dir (`lib/pkgconfig` → `../../`); harmless in paths but normalize
+  with `string(REGEX REPLACE "/$" "")`.
+- **Examples build in every preset** (`OPENCODE_BUILD_EXAMPLES` ON) so
+  embed_cli/event_host are `-Werror`-checked as part of the normal matrix —
+  docs-for-code drift is caught at compile time.
+- **Memory keys are strict** (`[A-Za-z0-9._-]` only): `demo/note` was rejected
+  as VALIDATION by design, not a bug. Examples/tests must use dot/underscore.
+
+### Deferred ideas (Phase 15+)
+
+- **ts/rust/py graph backends** behind `src/graph/` interface (the sym index
+  is engine-native today).
+- **A workspace watcher** (inotify) feeding the symbol index incrementally.
+- **Real-provider golden fixtures**: CI uses the mock provider only; record a
+  small set of real anthropic/openai SSE transcripts as golden wire fixtures
+  for the provider adapters.
+- **`opencode_session_t`** (reserved handle in the frozen ABI): expose
+  per-session drive/queue now that `drive()` semantics are pinned.
+- **Android CI build**: the NDK harness (`examples/android/`) is source-only;
+  a nightly NDK job would compile it for arm64.
+
+### Known limitations
+
+- `opencode_engine_run` is synchronous (v1); `drive()` returns OK-idle /
+  BUSY-mid-task and is a host pump, not a preemptive scheduler.
+- The engine ships no bundled model weights and does no local inference
+  (`OPENCODE_USE_EIGEN` is forbidden by policy).
+- `hardening` T2 asserts run with 5x slack; the reference-machine numbers in
+  `docs/TARGETS.md` are the locked ones.
+- pkg-config `Requires.private` lists the optional backends only when built
+  with them (default build: empty).
+
+### Next steps for the coder
+
+1. Start from `/sdcard/project/plan/` — the plans are the reference; extend
+   them, never re-invent. This repo is the implementation site.
+2. Keep the standing workflow: never `ninja`/`cmake --build` on the dev box
+   (low RAM) — single-TU `g++ -Werror -fsyntax-only` locally, gate on every
+   CI job concluding `success` (13 jobs), ASCII + `check_hidden_chars.sh`
+   before commits.
+3. The ABI is frozen at v1 (0.13.0). Any public-header change bumps
+   `OPENCODE_ABI_VERSION`/config/event versions AND ships a shim
+   (`docs/ABI.md`).
+4. Locked targets live in `docs/TARGETS.md`; T2 is asserted by the
+   `hardening` ctest on every run. Prove every perf change with
+   `tools/measure`.
+5. Reproduce fuzz findings with `tests/fuzz_test --seed N --iters 5000`
+   (~0.5 s); run the soak driver (`tools/soak`) after resilience changes.
+6. Regenerate `reports/final_measure.json` (`tools/measure --out`) whenever
+   the engine changes; update `docs/TARGETS.md` measured column with
+   evidence.
 
 ---
 

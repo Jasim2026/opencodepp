@@ -24,6 +24,7 @@ a phase may not be closed on any target regression.
 | 11 Memory | `17_PHASE_11.md` | **done** | `reports/11.md` | entries, session checkpoint/resume, workspace memory + `memory.write`, summarizer; CI 8/8 (runs 30939531111, 30940472091); runs 30922047079/30936523648/30938856273 failed 3/8 on dangling string_view, fixed by 225e765 |
 | 12 ABI/bindings | `18_PHASE_12.md` | **done** | `reports/12.md` | frozen ABI v1, CLI, python + jni bindings; CI 10/10 (run 30954191463); pipeline grew to 10 jobs |
 | 13 Optimization/hardening | `19_PHASE_13.md` | **done** | `reports/13.md` | T2 gate, fuzz, soak, measure; CI 12/12 (run 30957809938) |
+| 14 Packaging/docs/handover | `20_PHASE_14.md` | **done** | `reports/14.md` | install/export + find_package + pkg-config, docs, examples; CI 13/13 (run 30961406711); final measure committed |
 | 14 Packaging/handover | `20_PHASE_14.md` | open | `reports/14.md` | install, docs, final measure |
 
 ## Locked targets (record evidence each phase; do not erase history)
@@ -42,12 +43,14 @@ a phase may not be closed on any target regression.
 | T2 | stripped `-Os` binary | **< 15 MB** | 13 | 1.84 MB (opencodepp_cli) | ✓ |
 
 ## Global invariants (any regression blocks phase close)
-- [ ] `dev` preset builds `-Wall -Wextra -Wpedantic -Werror` clean
-- [ ] `ctest` green on the phase's suites (ASan/UBSan in dev; ASan asserted in CI)
-- [ ] no aborts on retryable network errors anywhere (never-abort)
-- [ ] no secrets in code/tests/commits; secret filter enforced (Phase 11)
-- [ ] all prompt text only in `src/prompt/templates/`; all tests in `tests/<mod>_test.cpp`
-- [ ] ABI frozen after Phase 12 (any change → version bump + `docs/ABI.md` note)
+- [x] `dev` preset builds `-Wall -Wextra -Wpedantic -Werror` clean
+- [x] `ctest` green on the phase's suites (ASan/UBSan in dev; ASan asserted in CI)
+- [x] no aborts on retryable network errors anywhere (never-abort)
+- [x] no secrets in code/tests/commits; secret filter enforced (Phase 11)
+- [x] all prompt text only in `src/prompt/templates/`; all tests in `tests/<mod>_test.cpp`
+- [x] ABI frozen after Phase 12 (any change → version bump + `docs/ABI.md` note)
+
+All verified by the final 13-job CI matrix (run 30961406711).
 
 ## Close-a-phase ritual (do this in the same commit as the code)
 1. run the phase's acceptance gate commands verbatim (on CI = the authoritative site);

@@ -90,7 +90,7 @@ std::string to_json(const Entry& e) {
     using util::JVal;
     std::vector<std::pair<std::string_view, JVal>> fields;
     fields.emplace_back("id", JVal::Str(e.id));
-    fields.emplace_back("kind", JVal::Str(std::string(kind_name(e.kind))));
+    fields.emplace_back("kind", JVal::Str(kind_name(e.kind)));
     fields.emplace_back("scope", JVal::Str(e.scope));
     fields.emplace_back("key", JVal::Str(e.key));
     fields.emplace_back("value", JVal::Str(e.value));

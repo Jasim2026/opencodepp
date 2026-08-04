@@ -129,6 +129,26 @@ jobs:
           echo "$OUT" | grep -q '"finish_reason":"stop"'
           echo "mock-api SSE smoke: OK"
 
+  py-binding:
+    name: python binding (ctypes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+
+      - name: Configure
+        run: cmake --preset dev
+
+      - name: Build shared library
+        run: cmake --build --preset dev -j "$(nproc)" --target opencodepp_shared
+
+      - name: Run python binding test (needs libopencodepp.so)
+        run: python3 bindings/python/tests/py_binding_test.py
+
   hygiene:
     name: source hygiene
     runs-on: ubuntu-latest

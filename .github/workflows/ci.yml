@@ -179,6 +179,51 @@ jobs:
             java -Djava.library.path="$GITHUB_WORKSPACE/build/release/bindings/jni" \
             -cp bindings/jni/java io.opencode.Opencode
 
+  fuzz:
+    name: fuzz sweep (ASan, multiple seeds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+
+      - name: Configure (dev = ASan/UBSan)
+        run: cmake --preset dev
+
+      - name: Build fuzz_test
+        run: cmake --build --preset dev -j "$(nproc)" --target fuzz_test
+
+      - name: Fuzz sweep (5 seeds)
+        run: |
+          for seed in 1 7 42 99 2026; do
+            ./build/dev/tests/fuzz_test --seed "$seed" --iters 1000
+          done
+
+  soak:
+    name: soak (mock resilience)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+
+      - name: Configure & build run_agent + soak
+        run: |
+          cmake --preset dev
+          cmake --build --preset dev -j "$(nproc)" \
+            --target run_agent soak
+
+      - name: Long soak (24 tasks, faults every 4th)
+        run: |
+          ./build/dev/tools/soak --bin ./build/dev/tools/run_agent \
+            --tasks 24 --fault-every 4 --task-timeout 60 --workspace /tmp/soak_ws
+
   hygiene:
     name: source hygiene
     runs-on: ubuntu-latest

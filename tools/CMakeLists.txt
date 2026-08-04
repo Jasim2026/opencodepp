@@ -23,6 +23,16 @@ target_link_libraries(bench_graph PRIVATE opencodepp_static)
 add_executable(run_agent run_agent.cpp)
 target_link_libraries(run_agent PRIVATE opencodepp_static)
 add_test(NAME run_agent_mock COMMAND run_agent --mock)
+add_test(NAME run_agent_fault COMMAND run_agent --mock --fault 2)
+
+# tools/soak -- long-run resilience driver. The ctest entry is a short soak;
+# the dedicated CI job runs the longer one.
+add_executable(soak soak.cpp)
+add_test(NAME soak_short COMMAND soak --bin $<TARGET_FILE:run_agent>
+  --tasks 3 --fault-every 2 --task-timeout 30)
+
+set_tests_properties(run_agent_mock run_agent_fault soak_short PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 add_executable(opencode_cli opencode_cli.cpp)
 target_link_libraries(opencode_cli PRIVATE opencodepp_static)
@@ -42,8 +52,4 @@ add_test(NAME hardening
   COMMAND measure --bin $<TARGET_FILE:opencode_cli> --trials 3
           --size-limit ${OPENCODE_SIZE_LIMIT_MB})
 set_tests_properties(hardening PROPERTIES
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
-
-# run_agent needs the prompt templates, so it runs from the repo root.
-set_tests_properties(run_agent_mock PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")

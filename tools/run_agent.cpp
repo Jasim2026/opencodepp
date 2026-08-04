@@ -38,7 +38,7 @@ namespace {
 using namespace opencode;
 
 struct Args {
-    std::string prompt = "List the files in the workspace and report.";
+    std::string prompt;                 /* "" = use the built-in default      */
     std::string provider_id = "openai_compat";
     std::string base = "http://127.0.0.1:8080";
     std::string key = "sk-test";
@@ -47,6 +47,7 @@ struct Args {
     std::string workspace = "/tmp/opencode_agent_ws";
     tools::Policy policy = tools::Policy::allow_readonly;
     bool mock = false;
+    int fault = -1; /* mock fault scenario; -1 = none */
 };
 
 void usage() {
@@ -55,7 +56,11 @@ void usage() {
                  "                  [--model NAME] [--provider ID]\n"
                  "                  [--workspace DIR] [--policy "
                  "allow|readonly|ask|deny]\n"
-                 "                  [--mock]\n");
+                 "                  [--mock [--fault N]]\n"
+                 "  --fault N  with --mock: inject a transient fault on the\n"
+                 "             first request to exercise the retry/backoff path:\n"
+                 "               1 = HTTP 500, 2 = truncated SSE stream,\n"
+                 "               3 = malformed SSE frame\n");
 }
 
 /* In-process OpenAI-compat SSE server (plaintext; TLS is Phase 12/13). */
@@ -124,6 +129,29 @@ std::string sse_resp(const std::vector<std::string>& frames) {
     return out;
 }
 
+/* Fault 1: HTTP 500 with a JSON error body (retryable transport failure). */
+std::string http_500_resp() {
+    return "HTTP/1.1 500 Internal Server Error\r\n"
+           "Content-Type: application/json\r\n"
+           "Content-Length: 52\r\n"
+           "Connection: close\r\n\r\n"
+           "{\"error\":{\"message\":\"upstream overloaded\",\"type\":\"x\"}}";
+}
+
+/* Fault 2: chunked SSE stream truncated mid-frame (no terminating chunk). */
+std::string truncated_sse_resp() {
+    return "HTTP/1.1 200 OK\r\n"
+           "Content-Type: text/event-stream\r\n"
+           "Transfer-Encoding: chunked\r\n"
+           "Connection: close\r\n\r\n"
+           "1e\r\ndata: {\"choices\":[{\"delta\":{\"con";
+}
+
+/* Fault 3: well-formed SSE frame carrying malformed JSON. */
+std::string malformed_sse_resp() {
+    return sse_resp({"{\"choices\":[{\"delta\":{}}}junk"});
+}
+
 FakeServer start_server(const std::function<std::string(int)>& h) {
     const int port = ephemeral_port();
     const int ls = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -172,7 +200,15 @@ void on_event(void* /*userdata*/, const agent::AgentEvent& ev) {
 }
 
 int run(const Args& a) {
-    ::system(("rm -rf " + a.workspace + " && mkdir -p " + a.workspace).c_str());
+    const std::string prompt =
+        a.prompt.empty() ? "List the files in the workspace and report."
+                         : a.prompt;
+    const std::string mk =
+        "rm -rf " + a.workspace + " && mkdir -p " + a.workspace;
+    if (::system(mk.c_str()) != 0) {
+        std::fprintf(stderr, "run_agent: cannot reset workspace\n");
+        return 1;
+    }
 
     config::Config cfg;
     config::ProviderCfg pc;
@@ -240,7 +276,7 @@ int run(const Args& a) {
     lo.retry.max_retries = 2;
 
     agent::Agent agent(session, lo);
-    const agent::DriveResult r = agent.drive(a.prompt);
+    const agent::DriveResult r = agent.drive(prompt);
 
     std::fprintf(stdout, "  drive: ec=%d iterations=%u tokens=%llu\n",
                  static_cast<int>(r.ec.code()), r.iterations,
@@ -299,6 +335,8 @@ int main(int argc, char** argv) {
             }
         } else if (arg == "--mock") {
             a.mock = true;
+        } else if (arg == "--fault") {
+            a.fault = std::atoi(need("--fault"));
         } else if (arg == "--help" || arg == "-h") {
             usage();
             return 0;
@@ -310,9 +348,17 @@ int main(int argc, char** argv) {
 
     if (a.mock) {
         /* One text-only round against the in-process fake server. The server
-         * must outlive the whole drive, so run() happens inside this scope. */
-        auto srv = start_server([](int i) {
-            if (i == 0)
+         * must outlive the whole drive, so run() happens inside this scope.
+         * With --fault N the first request fails transiently so the retry/
+         * backoff lane in the agent loop is exercised (request 1 succeeds). */
+        const int fault = a.fault;
+        auto srv = start_server([fault](int i) {
+            if (i == 0) {
+                if (fault == 1) return http_500_resp();
+                if (fault == 2) return truncated_sse_resp();
+                if (fault == 3) return malformed_sse_resp();
+            }
+            if (i <= 1)
                 return sse_resp({
                     "{\"choices\":[{\"delta\":{\"content\":\"Hello \"},\"finish_reason\":null}]}",
                     "{\"choices\":[{\"delta\":{\"content\":\"world\"},\"finish_reason\":null}]}",
@@ -322,7 +368,6 @@ int main(int argc, char** argv) {
                 "{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"});
         });
         a.base = "http://127.0.0.1:" + std::to_string(srv.port);
-        a.prompt = "tell me a greeting please";
         return run(a);
     }
 

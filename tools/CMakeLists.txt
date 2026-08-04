@@ -26,6 +26,23 @@ add_test(NAME run_agent_mock COMMAND run_agent --mock)
 
 add_executable(opencode_cli opencode_cli.cpp)
 target_link_libraries(opencode_cli PRIVATE opencodepp_static)
+set_target_properties(opencode_cli PROPERTIES OUTPUT_NAME "opencodepp_cli")
+
+# tools/measure -- Phase 13 T2 measurement + hardening gate. The binary-size
+# budget applies only to the stripped -Os build; other presets are
+# informational (dev builds carry ASan/debug overhead by design).
+add_executable(measure measure.cpp)
+target_link_libraries(measure PRIVATE opencodepp_static)
+if(CMAKE_CXX_FLAGS MATCHES "-Os")
+  set(OPENCODE_SIZE_LIMIT_MB 15)
+else()
+  set(OPENCODE_SIZE_LIMIT_MB 0)
+endif()
+add_test(NAME hardening
+  COMMAND measure --bin $<TARGET_FILE:opencode_cli> --trials 3
+          --size-limit ${OPENCODE_SIZE_LIMIT_MB})
+set_tests_properties(hardening PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # run_agent needs the prompt templates, so it runs from the repo root.
 set_tests_properties(run_agent_mock PROPERTIES

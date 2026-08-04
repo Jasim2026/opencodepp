@@ -49,6 +49,12 @@ extern "C" {
 /* Version of the opencode_config_t layout (increments independently). */
 #define OPENCODE_CONFIG_VERSION 1u
 
+/* Release version of the implementation (not part of the frozen ABI, but
+ * carried here so hosts can print it without extra plumbing). Additive. */
+#define OPENCODE_VERSION_MAJOR 0u
+#define OPENCODE_VERSION_MINOR 13u
+#define OPENCODE_VERSION_PATCH 0u
+
 /*
  * opencode_abi_version() -- returns OPENCODE_ABI_VERSION.
  *

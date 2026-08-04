@@ -1,0 +1,370 @@
+// measure.cpp -- the Phase 13 T2 measurement + hardening gate.
+//
+// Measures the Phase 13 latency/memory/size budgets in-process against the
+// static lib and asserts them (with slack) so it doubles as the `hardening`
+// acceptance gate:
+//
+//   budget                    target    assert <   slack factor
+//   engine init (create+cfg)  100 ms     500 ms      5x
+//   idle RSS delta             10 MB      20 MB      2x
+//   active RSS delta           30 MB      40 MB      1.3x
+//   intent classify             1 ms       5 ms      5x
+//   context assembly           10 ms      50 ms      5x
+//   tool dispatch               5 ms      25 ms      5x
+//   verify gate                50 ms     250 ms      5x
+//   event emit                  1 ms       5 ms      5x
+//   opencodepp_cli binary      15 MB      15 MB      n/a (hard target)
+//
+// Emits a JSON report (default reports/13_measure.json) and exits non-zero on
+// the first budget violation. Run from the repo root (prompt templates load
+// from the repo layout). Never throws.
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "agent/intent.h"
+#include "app.hpp"
+#include "core/channel.h"
+#include "core/error.h"
+#include "core/task.h"
+#include "measure_common.h"
+#include "msg/message.h"
+#include "msg/part.h"
+#include "msg/tokens.h"
+#include "opencode/opencode.h"
+#include "prompt/context.h"
+#include "prompt/registry.h"
+#include "provider/provider.h"
+#include "tools/permission.h"
+#include "tools/registry.h"
+#include "tools/tool.h"
+#include "verify/gate.h"
+
+namespace {
+
+using namespace opencode;
+using opencode::core::error_code;
+
+struct Args {
+    std::string bin = "";
+    std::string out = "reports/13_measure.json";
+    int trials = 5;
+    double size_limit_mb = 15.0; /* 0 = informational (no size assertion) */
+};
+
+void usage(const char* argv0) {
+    std::fprintf(stderr,
+                 "usage: %s [--bin PATH] [--out PATH] [--trials N] [--size-limit MB]\n"
+                 "  --bin PATH       path to the opencodepp_cli binary (size check)\n"
+                 "  --out PATH       JSON report path (default reports/13_measure.json)\n"
+                 "  --trials N       trials per measurement (default 5)\n"
+                 "  --size-limit MB  hard binary-size budget; 0 = skip (informational)\n"
+                 "  Run from the repo root. Exits non-zero on a budget violation.\n",
+                 argv0);
+}
+
+/* ---- latency micro-benchmarks (each returns best-of-N wall microseconds) ---- */
+
+double bench_intent(int trials) {
+    const char* turns[] = {
+        "Fix the failing test in src/core/loop.cpp, it crashes on startup.",
+        "What does the channel do in this codebase?",
+        "Refactor tools/registry.cpp to use unique_ptr everywhere.",
+        "Run the tests and report.",
+    };
+    return measure::min_us(
+        [&]() {
+            volatile int sink = 0;
+            for (int i = 0; i < 2000; ++i)
+                sink += static_cast<int>(
+                    agent::classify_intent(turns[i % 4]).intent);
+            (void)sink;
+        },
+        trials) / 2000.0;
+}
+
+struct ContextFixture {
+    prompt::PromptRegistry reg;
+    provider::MsgList history;
+    bool ready = false;
+
+    ContextFixture() {
+        for (const char* dir :
+             {"src/prompt/templates", "../src/prompt/templates",
+              "opencodepp/src/prompt/templates"}) {
+            if (prompt::load_templates(dir, reg).ok()) {
+                ready = true;
+                break;
+            }
+        }
+        if (!ready) return;
+        msg::Message u1, a1, u2;
+        u1.role = msg::Role::user;
+        u1.parts.push_back(msg::Text{"Hello, help me understand the codebase."});
+        a1.role = msg::Role::assistant;
+        a1.parts.push_back(msg::Text{"The codebase is C++20. Ask away."});
+        u2.role = msg::Role::user;
+        u2.parts.push_back(msg::Text{"Now fix the bug in core/loop.cpp."});
+        history.push_back(std::move(u1));
+        history.push_back(std::move(a1));
+        history.push_back(std::move(u2));
+    }
+};
+
+double bench_context(const ContextFixture& fx, int trials) {
+    if (!fx.ready) return -1.0;
+    prompt::ContextInput in;
+    in.registry = &fx.reg;
+    in.messages = &fx.history;
+    in.context_window = 128'000;
+    return measure::min_us(
+        [&]() {
+            prompt::ContextPlan plan;
+            for (int i = 0; i < 20; ++i) {
+                const error_code ec = prompt::assemble_context(in, plan);
+                if (!ec.ok()) std::abort();
+            }
+        },
+        trials) / 20.0;
+}
+
+struct NoopTool final : public tools::Tool {
+    tools::ToolSpec spec_;
+    NoopTool() {
+        spec_.id = "noop";
+        spec_.name = "noop";
+        spec_.description = "measurement no-op tool";
+        spec_.params_schema = "{\"type\":\"object\",\"properties\":{}}";
+    }
+    const tools::ToolSpec& spec() const override { return spec_; }
+    tools::ToolResult run(const tools::Invocation&,
+                          tools::ToolContext&) override {
+        tools::ToolResult r;
+        r.tool_id = spec_.id;
+        r.content = "noop";
+        return r;
+    }
+};
+
+double bench_dispatch(int trials) {
+    tools::ToolRegistry reg;
+    if (!reg.add(std::make_unique<NoopTool>()).ok()) return -1.0;
+    tools::Invocation inv;
+    inv.tool_name = "noop";
+    inv.args_json = "{}";
+    tools::ToolContext tc;
+    return measure::min_us(
+        [&]() {
+            for (int i = 0; i < 5000; ++i) {
+                const tools::ToolResult r = reg.run("noop", inv, tc);
+                if (r.status != tools::ToolStatus::ok) std::abort();
+            }
+        },
+        trials) / 5000.0;
+}
+
+double bench_gate(int trials) {
+    verify::Gate gate;
+    verify::Context ctx;
+    const verify::EditProposal good{
+        "file.write", "", "f.cpp", "", "int f() { return 0; }\n", ""};
+    return measure::min_us(
+        [&]() {
+            for (int i = 0; i < 20; ++i) {
+                const std::vector<verify::GateResult> rs = gate.run_all(good, ctx);
+                if (rs.empty() || !rs.back().pass) std::abort();
+            }
+        },
+        trials) / 20.0;
+}
+
+double bench_event_emit(int trials) {
+    core::Channel ch(256);
+    static const char kPayload[64] = {
+        "phase=fuzz detail=frame1234 payload=xxxxxxxxxxxxxxx"};
+    return measure::min_us(
+        [&]() {
+            core::Channel::Message out;
+            for (int i = 0; i < 5000; ++i) {
+                if (!ch.try_push(7u, kPayload,
+                                 static_cast<uint32_t>(sizeof kPayload)))
+                    std::abort();
+                if (ch.try_pop(out) != core::Channel::kOk) std::abort();
+            }
+        },
+        trials) / 5000.0;
+}
+
+/* ---- engine init + memory ---- */
+
+struct InitResult {
+    double min_init_ms = -1.0;
+    long rss_before_kb = -1;
+    long rss_after_kb = -1;
+};
+
+InitResult bench_init(const Args& a, const std::string& workspace) {
+    InitResult r;
+    const std::string rm = "rm -rf " + workspace + " && mkdir -p " + workspace;
+    if (::system(rm.c_str()) != 0) {
+        /* best-effort; a fresh workspace is a nice-to-have, not a gate */
+    }
+    config::Config cfg;
+    measure::trim_allocator();
+    r.rss_before_kb = measure::rss_kb_min();
+    r.min_init_ms = measure::min_us(
+        [&]() {
+            app::Engine e;
+            const error_code ec =
+                e.configure(cfg, workspace, "", tools::Policy::allow);
+            if (!ec.ok()) std::abort();
+        },
+        a.trials) / 1000.0;
+    measure::trim_allocator();
+    r.rss_after_kb = measure::rss_kb_min();
+    return r;
+}
+
+/* ---- report ---- */
+
+void emit_json(const char* path, const measure::PerfRow* rows, int n,
+               const InitResult& init, long bin_bytes, bool ok) {
+    FILE* f = std::fopen(path, "w");
+    if (f == nullptr) return;
+    std::fprintf(f,
+                 "{\n"
+                 "  \"tool\": \"measure\",\n"
+                 "  \"version\": \"%u.%u.%u\",\n"
+                 "  \"abi\": %u,\n"
+                 "  \"ok\": %s,\n"
+                 "  \"engine_init_ms\": %.3f,\n"
+                 "  \"rss_before_kb\": %ld,\n"
+                 "  \"rss_after_kb\": %ld,\n"
+                 "  \"cli_binary_bytes\": %ld,\n"
+                 "  \"budgets\": [\n",
+                 OPENCODE_VERSION_MAJOR, OPENCODE_VERSION_MINOR,
+                 OPENCODE_VERSION_PATCH, OPENCODE_ABI_VERSION, ok ? "true" : "false",
+                 init.min_init_ms, init.rss_before_kb, init.rss_after_kb,
+                 bin_bytes);
+    for (int i = 0; i < n; ++i) {
+        std::fprintf(f,
+                     "    {\"name\":\"%s\",\"min_us\":%.1f,\"target_ms\":%.1f,"
+                     "\"pass\":%s}%s\n",
+                     rows[i].name, rows[i].min_us, rows[i].limit_ms,
+                     rows[i].pass ? "true" : "false", i + 1 < n ? "," : "");
+    }
+    std::fprintf(f, "  ]\n}\n");
+    std::fclose(f);
+}
+
+} /* namespace */
+
+int main(int argc, char** argv) {
+    Args a;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto need = [&](const char* what) -> const char* {
+            if (i + 1 >= argc) {
+                std::fprintf(stderr, "measure: %s needs a value\n", what);
+                usage(argv[0]);
+                std::exit(2);
+            }
+            return argv[++i];
+        };
+        if (arg == "--bin") {
+            a.bin = need("--bin");
+        } else if (arg == "--out") {
+            a.out = need("--out");
+        } else if (arg == "--trials") {
+            a.trials = std::atoi(need("--trials"));
+            if (a.trials < 1) a.trials = 1;
+        } else if (arg == "--size-limit") {
+            a.size_limit_mb = std::atof(need("--size-limit"));
+            if (a.size_limit_mb < 0) a.size_limit_mb = 0;
+        } else {
+            usage(argv[0]);
+            return 2;
+        }
+    }
+
+    const std::string ws = "/tmp/opencode_measure_ws";
+
+    measure::PerfRow rows[9];
+    int n = 0;
+
+    /* T2 init + memory. Sampled FIRST so rss_before is a true process floor. */
+    const InitResult init = bench_init(a, ws);
+    const long rss_delta = init.rss_after_kb - init.rss_before_kb;
+    rows[n++] = {"engine_init", init.min_init_ms * 1000.0, 100.0, 400.0,
+                 init.min_init_ms >= 0 && init.min_init_ms <= 500.0};
+    rows[n++] = {"rss_idle_delta_kb", static_cast<double>(rss_delta), 10240.0,
+                 10240.0, rss_delta >= 0 && rss_delta <= 20480};
+
+    /* T2 latency budgets (target ms, assert = target*slack). The fixture and
+     * the benchs allocate, so active RSS is sampled after them. */
+    const ContextFixture fx;
+    const double intent = bench_intent(a.trials);
+    const double context = bench_context(fx, a.trials);
+    const double dispatch = bench_dispatch(a.trials);
+    const double gate = bench_gate(a.trials);
+    const double event = bench_event_emit(a.trials);
+
+    rows[n++] = {"intent_classify", intent, 1.0, 5.0,
+                 intent >= 0 && intent <= 5000.0};
+    rows[n++] = {"context_assembly", context, 10.0, 50.0,
+                 context >= 0 && context <= 50000.0};
+    rows[n++] = {"tool_dispatch", dispatch, 5.0, 25.0,
+                 dispatch >= 0 && dispatch <= 25000.0};
+    rows[n++] = {"verify_gate", gate, 50.0, 250.0,
+                 gate >= 0 && gate <= 250000.0};
+    rows[n++] = {"event_emit", event, 1.0, 5.0,
+                 event >= 0 && event <= 5000.0};
+
+    /* Active RSS: peak over the latency benchs (which allocate plans, tools,
+     * gate results, etc.). */
+    const long active_delta = measure::hwm_kb() - init.rss_before_kb;
+    rows[n++] = {"rss_active_delta_kb", static_cast<double>(active_delta),
+                 30720.0, 10240.0,
+                 active_delta >= 0 && active_delta <= 40960};
+
+    /* T2 binary size. Enforced only when --size-limit > 0 and --bin given;
+     * otherwise informational (the stripped size build is the gate). */
+    const long bin_bytes = a.bin.empty() ? -1 : measure::file_size(a.bin);
+    const bool size_enforced = a.size_limit_mb > 0 && !a.bin.empty();
+    const long size_limit_bytes =
+        static_cast<long>(a.size_limit_mb * 1048576.0);
+    rows[n++] = {"cli_binary_bytes", static_cast<double>(bin_bytes),
+                 static_cast<double>(size_limit_bytes), 0.0,
+                 !size_enforced || (bin_bytes >= 0 &&
+                                    bin_bytes <= size_limit_bytes)};
+
+    const bool ok = measure::rows_ok(rows, n) && fx.ready && rss_delta >= 0 &&
+                    active_delta >= 0 &&
+                    (bin_bytes >= 0 || !size_enforced);
+
+    std::printf("opencodepp measure %u.%u.%u (abi %u)\n", OPENCODE_VERSION_MAJOR,
+                OPENCODE_VERSION_MINOR, OPENCODE_VERSION_PATCH, OPENCODE_ABI_VERSION);
+    std::printf("engine init: %.3f ms (target < 100 ms)\n", init.min_init_ms);
+    std::printf("rss: before=%ld kB idle-after=%ld kB active-delta=%ld kB\n",
+                init.rss_before_kb, init.rss_after_kb, active_delta);
+    if (bin_bytes < 0) {
+        std::printf("cli binary: not found (%s) -- size informational\n",
+                    a.bin.c_str());
+    } else {
+        std::printf("cli binary: %ld bytes (%.2f MB%s)\n", bin_bytes,
+                    static_cast<double>(bin_bytes) / 1048576.0,
+                    size_enforced ? "" : " -- informational");
+    }
+    std::printf("\nbudget table (assert = target + slack):\n");
+    measure::print_rows(rows, n);
+
+    emit_json(a.out.c_str(), rows, n, init, bin_bytes, ok);
+    std::printf("\nreport: %s\n", a.out.c_str());
+    std::printf("%s\n", ok ? "hardening: PASS" : "hardening: FAIL");
+    return ok ? 0 : 1;
+}

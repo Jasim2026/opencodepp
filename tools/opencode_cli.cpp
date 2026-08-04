@@ -57,7 +57,8 @@ void usage(const char* argv0) {
                  "  --model NAME      model id\n"
                  "  --agent NAME      agent profile id\n"
                  "  --policy P        allow | readonly | ask | deny (default readonly)\n"
-                 "  --stats           print the metrics snapshot after a run\n"
+                  "  --stats           print the metrics snapshot after a run\n"
+                 "  --version         print version and ABI version, then exit\n"
                  "  Ctrl-C cancels the in-flight run.\n",
                  argv0);
 }
@@ -226,6 +227,13 @@ int main(int argc, char** argv) {
             }
         } else if (std::strcmp(arg, "--stats") == 0) {
             a.stats = true;
+        } else if (std::strcmp(arg, "--version") == 0 ||
+                   std::strcmp(arg, "-v") == 0) {
+            std::printf("opencodepp %u.%u.%u (abi %u, config %u, event %u)\n",
+                        OPENCODE_VERSION_MAJOR, OPENCODE_VERSION_MINOR,
+                        OPENCODE_VERSION_PATCH, OPENCODE_ABI_VERSION,
+                        OPENCODE_CONFIG_VERSION, OPENCODE_EVENT_VERSION);
+            return 0;
         } else if (std::strcmp(arg, "run") == 0) {
             mode = "run";
             if (i + 1 < argc) task = argv[++i];
@@ -242,7 +250,11 @@ int main(int argc, char** argv) {
     }
 
     std::string mk = "mkdir -p " + a.workspace;
-    std::system(mk.c_str());
+    if (std::system(mk.c_str()) != 0) {
+        std::fprintf(stderr, "opencode_cli: cannot create %s\n",
+                     a.workspace.c_str());
+        return 1;
+    }
 
     const opencode_config_t cfg = build_config(a);
     abi::Engine engine(&cfg);

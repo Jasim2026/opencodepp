@@ -16,6 +16,7 @@ option(OPENCODE_USE_ZSTD      "Use zstd as the util/CompressBackend" OFF)
 option(OPENCODE_USE_DOCTEST   "Use vendored doctest for unit tests" OFF)
 option(OPENCODE_USE_EIGEN     "Use Eigen (FORBIDDEN: no local ML)" OFF)
 option(OPENCODE_ENABLE_SANITIZERS "Build with Address/UB sanitizers" OFF)
+option(OPENCODE_BUILD_EXAMPLES "Build the example hosts in examples/" ON)
 
 if(OPENCODE_USE_EIGEN)
   message(FATAL_ERROR
@@ -60,6 +61,9 @@ if(BUILD_TESTING)
 endif()
 add_subdirectory(tools)
 add_subdirectory(bindings)
+if(OPENCODE_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 message(STATUS "opencodepp ${PROJECT_VERSION} configured "
                "(mbedtls=${OPENCODE_USE_MBEDTLS} tree_sitter=${OPENCODE_USE_TREE_SITTER} "

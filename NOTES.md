@@ -295,6 +295,42 @@ production code as TODO stubs. Checkpoint reports reference this file by section
   no-op). Assert the *whole set* on the boundary (`folded_count == 6`) rather
   than just "non-empty".
 
+## Phase 12 lessons
+
+- **JSON string escaping has a double-decoding trap in mock tool calls.** A
+  tool-call `content` with a newline must be escaped at BOTH layers: the
+  outer SSE `arguments` string and the inner JSON body. Bytes `\\n` (2
+  backslashes in the literal) decode once to a raw newline → the strict proto
+  parser rejects the args (`verify invalid file.write: proto_parse`) and the
+  tool silently never runs — yet the run still returns OK because the model
+  just "finishes" on the error feedback. Need `\\\\n` (4) in the literal so
+  the args stay valid JSON with a `\n` escape. The C++ e2e had it right; the
+  Python tests were the only ones bitten. Diagnose tool rounds by dumping the
+  mock's request bodies (the tool feedback message names the failing stage).
+- **Mock providers must match the real wire path.** The python test handler
+  checked `/v1/chat`; the openai_compat provider posts to
+  `/chat/completions` → 404 → retries exhausted. Serve the path the client
+  actually uses.
+- **Never hold `opencode_event_t*` past the callback.** The engine reuses the
+  event buffer across a run; a host that reads `kind`/`text` lazily after
+  `run()` returns reads stale or garbage values. Snapshot every field
+  (including a text copy) inside the callback — the Python binding does this
+  now.
+- **ctypes CFUNCTYPE slots cannot be `None`.** Assigning `None` to a callback
+  struct field or passing it to a function whose argtype is a CFUNCTYPE
+  raises `ArgumentError` (not a graceful null). Pass a real no-op callback or
+  a NULL pointer explicitly; `byref(None)` also crashes.
+- **ASan-in-a-dlopened-library.** The `dev` preset links the sanitizer
+  runtime into `libopencodepp.so`; Python's dlopen then dies ("ASan runtime
+  does not come first in initial library list"). Hosts that dlopen the shared
+  lib must link against a non-sanitized build (CI uses the `release` preset
+  for the python binding job).
+- **Engine configure is CWD-sensitive for prompt templates.** With no
+  `prompt_dir`, template resolution tries `src/prompt/templates` etc. relative
+  to the process CWD → `e_invalid_cfg` (VALIDATION) from a subdir. All hosts
+  that need the default templates (CLI e2e, ABI test, Java harness) must run
+  from the repo root; bindings that embed a `prompt_dir` are immune.
+
 ---
 
 <!-- appends only; do not rewrite history -->

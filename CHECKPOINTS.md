@@ -22,7 +22,7 @@ a phase may not be closed on any target regression.
 | 09 Verification | `15_PHASE_09.md` | **done** | `reports/09.md` | gates + golden suite (T3); CI 8/8 (run 30886416695) |
 | 10 Agent loop | `16_PHASE_10.md` | **done** | `reports/10.md` | states, session, intent, loop, feedback, e2e scenarios, run_agent CLI; CI 8/8 (runs 30889823117, 30903600328, 30903963276, 30904639979); fault-injection suite deferred to P13 |
 | 11 Memory | `17_PHASE_11.md` | **done** | `reports/11.md` | entries, session checkpoint/resume, workspace memory + `memory.write`, summarizer; CI 8/8 (runs 30939531111, 30940472091); runs 30922047079/30936523648/30938856273 failed 3/8 on dangling string_view, fixed by 225e765 |
-| 12 ABI/bindings | `18_PHASE_12.md` | open | `reports/12.md` | C ABI v1, CLI, python, jni |
+| 12 ABI/bindings | `18_PHASE_12.md` | **done** | `reports/12.md` | frozen ABI v1, CLI, python + jni bindings; CI 10/10 (run 30954191463); pipeline grew to 10 jobs |
 | 13 Optimization/hardening | `19_PHASE_13.md` | open | `reports/13.md` | T2, fuzz, soak, measure |
 | 14 Packaging/handover | `20_PHASE_14.md` | open | `reports/14.md` | install, docs, final measure |
 

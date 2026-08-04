@@ -552,13 +552,22 @@ class GitToolBase {
 protected:
     explicit GitToolBase(std::string base) : base_(std::move(base)) {}
     std::string git_run(const std::string& args, bool& failed) const {
-        ProcOpts opts;
-        opts.cmd = "git " + args;
-        opts.working_dir = base_;
-        opts.timeout_ms = 5000;
-        ProcResult r;
-        failed = !run_process(opts, r).ok() || r.exit_code != 0;
-        return r.stdout;
+        /* Git probes are read-only, so a single retry is safe and absorbs
+         * transient spawn/index contention on loaded hosts. */
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            ProcOpts opts;
+            opts.cmd = "git " + args;
+            opts.working_dir = base_;
+            opts.timeout_ms = 10000;
+            ProcResult r;
+            const bool proc_ok = run_process(opts, r).ok();
+            if (proc_ok && r.exit_code == 0) {
+                failed = false;
+                return r.stdout;
+            }
+        }
+        failed = true;
+        return {};
     }
     std::string base_;
 };

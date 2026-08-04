@@ -26,7 +26,8 @@ foreach(test
     provider_test
     prompt_test
     graph_test
-    tools_test)
+    tools_test
+    permission_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
@@ -56,6 +57,10 @@ set_tests_properties(graph_test PROPERTIES
 # tools_test reads golden wire fixtures and builds its sandbox workspace from
 # the repo root.
 set_tests_properties(tools_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+# permission_test runs from the repo root (same sandbox convention as tools_test).
+set_tests_properties(permission_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # store_test runs the sqlite suite only when the optional backend is built.

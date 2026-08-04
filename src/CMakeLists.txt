@@ -50,6 +50,7 @@ set(OPENCODE_CORE_SOURCES
   tools/exec/read_only.cpp
   tools/exec/util.cpp
   tools/exec/write.cpp
+  tools/permission.cpp
   tools/registry.cpp
   tools/schema.cpp
   util/base64.cpp

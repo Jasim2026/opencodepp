@@ -253,6 +253,21 @@ public:
             return ok();
         }
 
+        const JVal* err = get_obj(d, "error");
+        if (err != nullptr) {
+            const std::string_view type = get_str(*err, "type");
+            const std::string message =
+                std::string(get_str(*err, "message"));
+            const Err code =
+                (type == "authentication_error" ||
+                 type == "invalid_api_key" || type == "insufficient_quota")
+                    ? Err::e_auth
+                    : (type == "rate_limit_error" ? Err::e_rate_limit
+                                                  : Err::e_provider_err);
+            out.push_back(ProviderError{make_error_code(code), message});
+            return ok();
+        }
+
         const JVal* choices = get_arr(d, "choices");
         if (choices != nullptr) {
             for (const JVal& c : choices->arr) {

@@ -9,7 +9,9 @@
 
 set(OPENCODE_CORE_SOURCES
   abi/version.cpp
+  agent/feedback.cpp
   agent/intent.cpp
+  agent/loop.cpp
   agent/session.cpp
   config/config.cpp
   config/env_snapshot.cpp

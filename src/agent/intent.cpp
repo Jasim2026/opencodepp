@@ -49,10 +49,6 @@ bool has_any(std::string_view hay, const std::string_view (&words)[N]) {
     return false;
 }
 
-bool has_substr(std::string_view hay, std::string_view needle) {
-    return hay.find(needle) != std::string_view::npos;
-}
-
 bool is_path_ext(std::string_view token) {
     const size_t dot = token.rfind('.');
     if (dot == std::string_view::npos || dot == 0) return false;

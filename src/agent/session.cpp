@@ -101,7 +101,10 @@ void Session::append_tool_result(std::string_view call_id,
     msg::Message m;
     m.id = next_msg_id();
     m.session_id = id_;
-    m.role = msg::Role::tool;
+    /* Tool results are not a wire role for any provider family: they live
+     * inside user messages as ToolResult parts (the adapters split them into
+     * role:tool / tool_result / functionResponse wire blocks). */
+    m.role = msg::Role::user;
     m.created_at = static_cast<std::uint64_t>(core::now_wall_sec());
     m.parts.push_back(msg::ToolResult{std::string(call_id), std::string(content),
                                       is_error});

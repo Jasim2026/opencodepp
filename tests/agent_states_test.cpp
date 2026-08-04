@@ -156,7 +156,7 @@ void test_session_messages() {
 
     s.append_tool_result("call-1", "wrote a.txt", false);
     CHECK(s.messages().size() == 3);
-    CHECK(s.messages()[2].role == opencode::msg::Role::tool);
+    CHECK(s.messages()[2].role == opencode::msg::Role::user);
     CHECK(s.messages()[2].tool_results().size() == 1);
     CHECK(s.messages()[2].tool_results()[0]->call_id == "call-1");
 

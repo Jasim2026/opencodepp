@@ -31,7 +31,8 @@ foreach(test
     shell_test
     verify_test
     verify_golden_test
-    agent_states_test)
+    agent_states_test
+    agent_loop_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
@@ -81,6 +82,8 @@ set_tests_properties(verify_golden_test PROPERTIES
 
 # agent tests run from the repo root.
 set_tests_properties(agent_states_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+set_tests_properties(agent_loop_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # store_test runs the sqlite suite only when the optional backend is built.

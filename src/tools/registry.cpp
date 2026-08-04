@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "tools/exec/read_only.h"
+#include "tools/exec/shell.h"
 #include "tools/exec/write.h"
 
 namespace opencode::tools {
@@ -71,6 +72,10 @@ core::error_code register_defaults(ToolRegistry& reg,
     if (opts.include_write) {
         if (const core::error_code c =
                 exec::make_write_tools(opts.workspace, tools);
+            !c.ok())
+            return c;
+        if (const core::error_code c =
+                exec::make_shell_tool(opts.workspace, tools);
             !c.ok())
             return c;
     }

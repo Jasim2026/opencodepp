@@ -48,6 +48,7 @@ set(OPENCODE_CORE_SOURCES
   store/mem_store.cpp
   tools/exec/patch.cpp
   tools/exec/read_only.cpp
+  tools/exec/shell.cpp
   tools/exec/util.cpp
   tools/exec/write.cpp
   tools/permission.cpp

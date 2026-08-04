@@ -59,6 +59,7 @@ if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 add_subdirectory(tools)
+add_subdirectory(bindings)
 
 message(STATUS "opencodepp ${PROJECT_VERSION} configured "
                "(mbedtls=${OPENCODE_USE_MBEDTLS} tree_sitter=${OPENCODE_USE_TREE_SITTER} "

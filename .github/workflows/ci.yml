@@ -149,6 +149,32 @@ jobs:
       - name: Run python binding test (needs libopencodepp.so)
         run: python3 bindings/python/tests/py_binding_test.py
 
+  jni-binding:
+    name: jni binding (JDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools + JDK
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build default-jdk
+
+      - name: Configure
+        run: cmake --preset release
+
+      - name: Build shared + JNI libraries
+        run: cmake --build --preset release -j "$(nproc)" \
+          --target opencodepp_shared opencodepp_jni
+
+      - name: Compile + run the Java harness
+        run: |
+          cd bindings/jni/java
+          javac io/opencode/Opencode.java
+          LD_LIBRARY_PATH="$PWD/../../../build/release/src" \
+            java -Djava.library.path="$PWD/../../../build/release/bindings/jni" \
+            io.opencode.Opencode
+
   hygiene:
     name: source hygiene
     runs-on: ubuntu-latest

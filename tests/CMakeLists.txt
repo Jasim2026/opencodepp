@@ -33,11 +33,15 @@ foreach(test
     verify_golden_test
     agent_states_test
     agent_loop_test
-    memory_test)
+    memory_test
+    fuzz_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
 endforeach()
+
+# A second fuzz seed for diversity; the dev preset (ASan/UBSan) is the gate.
+add_test(NAME fuzz_test_extra COMMAND fuzz_test --seed 7 --iters 300)
 
 # provider_test reads its golden wire fixtures from the source tree.
 set_tests_properties(provider_test PROPERTIES

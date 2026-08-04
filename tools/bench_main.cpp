@@ -1,6 +1,9 @@
 // bench_main.cpp -- benchmark runner skeleton (Phase 0).
 // Benchmarks register here; the T1/T2 measurement harness grows over phases.
-// Usage: bench_engine [--quick]
+// Usage: bench_engine [--quick] [--profile]
+//   --quick    only the fast subset (no soak/network)
+//   --profile  run the Phase 13 T2 profile micro-benchmarks (init, RSS, the
+//              five latency budgets) and print the table, then exit
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -9,7 +12,9 @@
 #include <string>
 #include <vector>
 
+#include "bench_profile.h"
 #include "core/arena.h"
+#include "measure_common.h"
 #include "msg/codec.h"
 #include "msg/message.h"
 #include "msg/part.h"
@@ -48,7 +53,9 @@ struct Bench {
 
 using namespace opencode::core;
 using namespace opencode::util;
-namespace core = opencode::core; /* qualified alias for the msg codec APIs */
+namespace core = opencode::core;   /* qualified alias for the msg codec APIs */
+namespace measure = opencode::measure; /* Phase 13 measurement helpers        */
+namespace profile = opencode::profile; /* Phase 13 T2 profile benchs          */
 
 /* ---- Phase 1: arena vs malloc (acceptance gate: >= 10x on warm reuse) ---- */
 
@@ -203,23 +210,64 @@ REGISTER_BENCH(tokens_message_500, {
 
 void usage(const char* argv0) {
     std::fprintf(stderr,
-                 "usage: %s [--quick]\n"
-                 "  --quick   run only the fast subset (no soak/network)\n",
+                 "usage: %s [--quick] [--profile]\n"
+                 "  --quick    run only the fast subset (no soak/network)\n"
+                 "  --profile  run the T2 profile micro-benchmarks, then exit\n",
                  argv0);
+}
+
+/* ---- Phase 13: T2 profile (init, RSS, latency budgets) ---- */
+
+int run_profile(int trials) {
+    const std::string ws = "/tmp/opencode_bench_ws";
+    measure::PerfRow rows[8];
+    int n = 0;
+
+    const profile::InitResult init = profile::bench_init(trials, ws);
+    const long rss_delta = init.rss_after_kb - init.rss_before_kb;
+    rows[n++] = {"engine_init", init.min_init_ms * 1000.0, 100.0, 400.0, true};
+    rows[n++] = {"rss_idle_delta_kb", static_cast<double>(rss_delta),
+                 10240.0, 10240.0, true};
+
+    const profile::ContextFixture fx;
+    const double intent = profile::bench_intent(trials);
+    const double context = profile::bench_context(fx, trials);
+    const double dispatch = profile::bench_dispatch(trials);
+    const double gate = profile::bench_gate(trials);
+    const double event = profile::bench_event_emit(trials);
+    rows[n++] = {"intent_classify", intent, 1.0, 5.0, intent >= 0};
+    rows[n++] = {"context_assembly", context, 10.0, 50.0, context >= 0};
+    rows[n++] = {"tool_dispatch", dispatch, 5.0, 25.0, dispatch >= 0};
+    rows[n++] = {"verify_gate", gate, 50.0, 250.0, gate >= 0};
+    rows[n++] = {"event_emit", event, 1.0, 5.0, event >= 0};
+
+    std::printf("opencodepp bench_engine --profile (trials=%d)\n", trials);
+    std::printf("engine init: %.3f ms; rss before=%ld kB after=%ld kB "
+                "delta=%ld kB\n",
+                init.min_init_ms, init.rss_before_kb, init.rss_after_kb,
+                rss_delta);
+    std::printf("\nT2 latency budgets:\n");
+    measure::print_rows(rows, n);
+    return 0;
 }
 
 } /* namespace */
 
 int main(int argc, char** argv) {
     bool quick = false;
+    bool profile = false;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--quick") == 0) {
             quick = true;
+        } else if (std::strcmp(argv[i], "--profile") == 0) {
+            profile = true;
         } else {
             usage(argv[0]);
             return 2;
         }
     }
+
+    if (profile) return run_profile(5);
 
     const double ns_per_op = measure_us([] {});
 

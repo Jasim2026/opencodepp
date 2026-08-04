@@ -171,9 +171,10 @@ jobs:
         run: |
           cd bindings/jni/java
           javac io/opencode/Opencode.java
-          LD_LIBRARY_PATH="$PWD/../../../build/release/src" \
-            java -Djava.library.path="$PWD/../../../build/release/bindings/jni" \
-            io.opencode.Opencode
+          cd "$GITHUB_WORKSPACE"
+          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/build/release/src" \
+            java -Djava.library.path="$GITHUB_WORKSPACE/build/release/bindings/jni" \
+            -cp bindings/jni/java io.opencode.Opencode
 
   hygiene:
     name: source hygiene

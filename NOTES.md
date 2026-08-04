@@ -263,4 +263,38 @@ production code as TODO stubs. Checkpoint reports reference this file by section
 
 ---
 
+## Phase 11 lessons
+
+- **`JVal::Str` stores a `std::string_view` — never wrap a temporary
+  `std::string` in it.** `JVal::Str(std::string(kind_name(e.kind)))` created a
+  view onto a temporary that died at the end of the full expression; ASan
+  reported `stack-use-after-scope` in `write_escaped` (`util/json.cpp:258`).
+  Any `JVal::Str(expr)` whose `expr` is not already a `string_view`/literal of
+  static duration must be reviewed. Fix: `JVal::Str(kind_name(e.kind))` (the
+  enum-name table is `constexpr` static storage).
+- **A "completed" CI run is not a green run.** All of Phase 11's first three
+  commits failed CI on the identical ASan bug, but the runs were recorded as
+  "green" because `gh run list --json status` says `completed` for *both*
+  success and failure. Always gate on `conclusion == "success"` (e.g.
+  `gh run watch <id> --exit-status`), never on `status`.
+- **One introduced bug can silently poison several subsequent commits.** The
+  dangling-view bug was born in the entries commit and masked by CI 3/8
+  failures on the same three jobs for two more commits. When a new failure
+  pattern appears, check the *introducing* commit, not just the latest one.
+- **No local ASan in proot** (`AddressSanitizer: out of memory` — heap size
+  exceeds max user virtual address). ASan-only issues must be caught by code
+  inspection plus CI's ASan jobs; keep `JVal::Str`/`string_view` lifetime in
+  mind when serializing.
+- **Aggregate-init call sites break when a struct gains a field** — adding
+  `store`/`memory_cfg` to `RegistryOptions` broke the brace-init sites in
+  `run_agent.cpp` and `agent_loop_test.cpp`. Update every aggregate init in
+  the same commit as the struct change (`-Wmissing-field-initializers` does
+  not fire on incomplete brace lists that happen to be valid).
+- **`needs_fold` thresholds interact with the fixture** — a 10×3-line test
+  history needs `context_window=100` to actually trigger the fold (400 was a
+  no-op). Assert the *whole set* on the boundary (`folded_count == 6`) rather
+  than just "non-empty".
+
+---
+
 <!-- appends only; do not rewrite history -->

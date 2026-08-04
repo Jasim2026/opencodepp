@@ -247,6 +247,96 @@ void test_impact_unchanged_def() {
     CHECK(issues.empty());
 }
 
+/* ---- diff checker tests ---- */
+
+void test_diff_write_no_change() {
+    EditProposal p;
+    p.tool_name = "file.write";
+    p.before_content = "hello";
+    p.after_content = "hello";
+    auto issues = check_diff(p);
+    CHECK(!issues.empty());
+    CHECK(issues[0].detail.find("no change") != std::string::npos);
+}
+
+void test_diff_write_ok() {
+    EditProposal p;
+    p.tool_name = "file.write";
+    p.before_content = "hello";
+    p.after_content = "hello world";
+    auto issues = check_diff(p);
+    CHECK(issues.empty());
+}
+
+void test_diff_patch_clean() {
+    EditProposal p;
+    p.tool_name = "file.patch";
+    p.path = "test.cpp";
+    p.before_content = "line1\nline2\nline3\n";
+    p.after_content = "line1\nmodified\nline3\n";
+    p.patch_text = "@@ -1,3 +1,3 @@\n line1\n-line2\n+modified\n line3\n";
+    auto issues = check_diff(p);
+    CHECK(issues.empty());
+}
+
+void test_diff_patch_conflict() {
+    EditProposal p;
+    p.tool_name = "file.patch";
+    p.path = "test.cpp";
+    p.before_content = "line1\nline2\nline3\n";
+    p.after_content = "line1\nmodified\nline3\n";
+    /* Patch tries to remove "line3" which doesn't match context */
+    p.patch_text = "@@ -1,3 +1,3 @@\n line1\n-line3\n+modified\n line2\n";
+    auto issues = check_diff(p);
+    CHECK(!issues.empty());
+}
+
+void test_diff_patch_bad_parse() {
+    EditProposal p;
+    p.tool_name = "file.patch";
+    p.path = "test.cpp";
+    p.before_content = "hello";
+    p.after_content = "hello world";
+    p.patch_text = "this is not a valid patch";
+    auto issues = check_diff(p);
+    CHECK(!issues.empty());
+}
+
+void test_diff_large_reformat() {
+    EditProposal p;
+    p.tool_name = "file.write";
+    p.path = "small.cpp";
+    /* 5-line file, almost every line changed */
+    p.before_content = "a\nb\nc\nd\ne\n";
+    p.after_content = "A\nB\nC\nD\nE\n";
+    auto issues = check_diff(p);
+    CHECK(!issues.empty());
+    CHECK(issues[0].detail.find("reformat") != std::string::npos);
+}
+
+/* ---- testmap tests ---- */
+
+void test_testmap_conventions() {
+    EditProposal p;
+    p.path = "src/tools/exec/patch.cpp";
+    auto mappings = map_tests(p);
+    CHECK(mappings.size() >= 2);
+    CHECK(mappings[0].test_file == "tests/patch_test.cpp");
+    CHECK(mappings[1].test_file == "tests/test_patch.cpp");
+}
+
+void test_testmap_own_test() {
+    EditProposal p;
+    p.path = "tests/tools_test.cpp";
+    auto mappings = map_tests(p);
+    bool found_self = false;
+    for (const auto& m : mappings)
+        if (m.test_file == "tests/tools_test.cpp" &&
+            m.rationale.find("is a test") != std::string::npos)
+            found_self = true;
+    CHECK(found_self);
+}
+
 int main() {
     std::printf("verify_test: running...\n");
 
@@ -278,6 +368,16 @@ int main() {
     test_impact_no_removal();
     test_impact_empty_graph();
     test_impact_unchanged_def();
+
+    test_diff_write_no_change();
+    test_diff_write_ok();
+    test_diff_patch_clean();
+    test_diff_patch_conflict();
+    test_diff_patch_bad_parse();
+    test_diff_large_reformat();
+
+    test_testmap_conventions();
+    test_testmap_own_test();
 
     std::printf("verify_test: %d passed, %d failed\n", passed, failed);
     return failed > 0 ? 1 : 0;

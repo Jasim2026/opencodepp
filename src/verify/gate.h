@@ -158,12 +158,18 @@ struct DiffIssue {
     std::uint32_t hunk_index = 0;
 };
 
+/* Apply patch and compare; flag no-op or overly large diffs. */
+std::vector<DiffIssue> check_diff(const EditProposal& proposal);
+
 /* ---- testmap (testmap.cpp) ---- */
 
 struct TestMapping {
     std::string test_file;       /* e.g. "tests/tools_test.cpp"          */
     std::string rationale;       /* why this test is affected             */
 };
+
+/* Map edited file to likely affected tests (informational, never blocks). */
+std::vector<TestMapping> map_tests(const EditProposal& proposal);
 
 } /* namespace opencode::verify */
 

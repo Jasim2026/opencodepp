@@ -77,37 +77,16 @@ GateResult check_impact_stage(const EditProposal& p, const Context& ctx) {
 }
 
 GateResult check_diff_stage(const EditProposal& p) {
-    if (p.patch_text.empty()) {
-        /* For file.write, verify after_content is non-empty and different. */
-        if (p.after_content == p.before_content) {
-            return fail(Stage::diff,
+    auto issues = check_diff(p);
+    if (issues.empty()) return pass(Stage::diff);
+    return fail(Stage::diff,
                 core::make_error_code(core::Err::e_verify_fail),
-                "edit produces no change", p.path);
-        }
-        return pass(Stage::diff);
-    }
-    /* For file.patch, try to apply the patch and verify the result. */
-    std::vector<tools::exec::patch::Hunk> hunks;
-    if (const core::error_code c = tools::exec::patch::parse(p.patch_text, hunks); !c.ok())
-        return fail(Stage::diff, c,
-                    "patch parse failed", p.path);
-    std::string applied;
-    if (const core::error_code c = tools::exec::patch::apply(hunks, p.before_content, applied); !c.ok())
-        return fail(Stage::diff, c,
-                    "patch does not apply cleanly (context mismatch)", p.path);
-    if (applied != p.after_content) {
-        return fail(Stage::diff,
-            core::make_error_code(core::Err::e_verify_fail),
-            "patch applied but result differs from expected after_content",
-            p.path);
-    }
-    return pass(Stage::diff);
+                issues[0].detail, p.path);
 }
 
-GateResult check_testmap_stage(const EditProposal& /*p*/, const Context& /*ctx*/) {
-    /* Testmap is informational -- it never blocks. It just lists affected tests.
-     * For now, it always passes. The actual mapping is in testmap.cpp and
-     * called by the agent (Phase 10). */
+GateResult check_testmap_stage(const EditProposal& p, const Context& /*ctx*/) {
+    auto mappings = map_tests(p);
+    (void)mappings; /* informational, never blocks */
     return pass(Stage::testmap);
 }
 

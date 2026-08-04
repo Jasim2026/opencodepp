@@ -46,6 +46,11 @@ set(OPENCODE_CORE_SOURCES
   prompt/context.cpp
   prompt/registry.cpp
   store/mem_store.cpp
+  tools/exec/patch.cpp
+  tools/exec/read_only.cpp
+  tools/exec/util.cpp
+  tools/exec/write.cpp
+  tools/registry.cpp
   tools/schema.cpp
   util/base64.cpp
   util/json.cpp

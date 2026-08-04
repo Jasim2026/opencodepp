@@ -124,6 +124,8 @@ public:
 
     /* ---- queries ---- */    core::error_code lookup(std::string_view qname, std::string_view file_hint,
                             Sym& out) const noexcept;
+    /* Sym by id (tombstoned ids return e_missing_cfg). */
+    core::error_code sym_by_id(SymId id, Sym& out) const noexcept;
     std::vector<Sym> all(SymKind kind, std::string_view prefix,
                          std::uint32_t limit) const noexcept;
     core::error_code snippet(SymId id, std::uint32_t max_bytes,

@@ -291,6 +291,14 @@ core::error_code SymbolIndex::lookup(std::string_view qname,
     return core::ok();
 }
 
+core::error_code SymbolIndex::sym_by_id(SymId id, Sym& out) const noexcept {
+    if (id < 1 || id > static_cast<SymId>(syms_.size())) return core::make_error_code(core::Err::e_missing_cfg);
+    const Sym& s = syms_[static_cast<size_t>(id) - 1];
+    if (s.id != id) return core::make_error_code(core::Err::e_missing_cfg);
+    out = s;
+    return core::ok();
+}
+
 std::vector<Sym> SymbolIndex::all(SymKind kind, std::string_view prefix,
                                   std::uint32_t limit) const noexcept {
     std::vector<Sym> out;

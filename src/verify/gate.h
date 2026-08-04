@@ -135,6 +135,10 @@ struct SymbolIssue {
     std::uint32_t line = 0;
 };
 
+/* Compare before/after defs; return issues for removed defs with callers. */
+std::vector<SymbolIssue> check_symbols(const EditProposal& proposal,
+                                       const GraphIndex& graph);
+
 /* ---- impact checker (impact.cpp) ---- */
 
 struct ImpactIssue {
@@ -142,6 +146,10 @@ struct ImpactIssue {
     std::string caller_name;
     std::string detail;
 };
+
+/* Find 1-hop callers of removed defs; report impact. */
+std::vector<ImpactIssue> check_impact(const EditProposal& proposal,
+                                      const GraphIndex& graph);
 
 /* ---- diff checker (diff.cpp) ---- */
 

@@ -55,7 +55,9 @@ set(OPENCODE_CORE_SOURCES
   tools/registry.cpp
   tools/schema.cpp
   verify/gate.cpp
+  verify/impact.cpp
   verify/syntax.cpp
+  verify/symbols.cpp
   util/base64.cpp
   util/json.cpp
   util/sha1.cpp)

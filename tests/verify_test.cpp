@@ -173,6 +173,80 @@ void test_gate_diff_ok() {
     CHECK(r.pass);
 }
 
+/* ---- symbol checker tests (no graph, just extract_defs) ---- */
+
+void test_symbols_no_removal() {
+    EditProposal p;
+    p.before_content = "int foo() { return 0; }\n";
+    p.after_content = "int foo() { return 1; }\n";
+    GraphIndex g; /* empty graph */
+    auto issues = check_symbols(p, g);
+    CHECK(issues.empty());
+}
+
+void test_symbols_removal_no_callers() {
+    EditProposal p;
+    p.before_content = "int helper() { return 0; }\nint main() { return helper(); }\n";
+    p.after_content = "int main() { return 0; }\n";
+    GraphIndex g; /* empty graph -- no callers to find */
+    auto issues = check_symbols(p, g);
+    /* With empty graph, lookup returns nothing, so no issues. */
+    CHECK(issues.empty());
+}
+
+void test_symbols_removal_with_graph() {
+    /* Simulate: helper() removed, and graph says it has callers.
+     * We need a graph that says "helper" has callers. Since we can't easily
+     * create a real SymbolIndex here, we test with an empty graph and verify
+     * the function doesn't crash. */
+    EditProposal p;
+    p.path = "test.cpp";
+    p.before_content = "void helper() {}\nvoid use() { helper(); }\n";
+    p.after_content = "void use() {}\n";
+    GraphIndex g;
+    auto issues = check_symbols(p, g);
+    /* Empty graph -> lookup fails -> no issues. */
+    CHECK(issues.empty());
+}
+
+void test_symbols_defines_still_present() {
+    EditProposal p;
+    p.before_content = "int foo() { return 0; }\nint bar() { return 0; }\n";
+    p.after_content = "int foo() { return 1; }\nint bar() { return 1; }\n";
+    GraphIndex g;
+    auto issues = check_symbols(p, g);
+    CHECK(issues.empty());
+}
+
+/* ---- impact checker tests (no graph) ---- */
+
+void test_impact_no_removal() {
+    EditProposal p;
+    p.before_content = "int foo() { return 0; }\n";
+    p.after_content = "int foo() { return 1; }\n";
+    GraphIndex g;
+    auto issues = check_impact(p, g);
+    CHECK(issues.empty());
+}
+
+void test_impact_empty_graph() {
+    EditProposal p;
+    p.before_content = "void helper() {}\n";
+    p.after_content = "/* removed */\n";
+    GraphIndex g;
+    auto issues = check_impact(p, g);
+    CHECK(issues.empty());
+}
+
+void test_impact_unchanged_def() {
+    EditProposal p;
+    p.before_content = "int foo() { return 0; }\nvoid bar() {}\n";
+    p.after_content = "int foo() { return 1; }\nvoid bar() {}\n";
+    GraphIndex g;
+    auto issues = check_impact(p, g);
+    CHECK(issues.empty());
+}
+
 int main() {
     std::printf("verify_test: running...\n");
 
@@ -195,6 +269,15 @@ int main() {
     test_gate_run_syntax_direct();
     test_gate_diff_no_change();
     test_gate_diff_ok();
+
+    test_symbols_no_removal();
+    test_symbols_removal_no_callers();
+    test_symbols_removal_with_graph();
+    test_symbols_defines_still_present();
+
+    test_impact_no_removal();
+    test_impact_empty_graph();
+    test_impact_unchanged_def();
 
     std::printf("verify_test: %d passed, %d failed\n", passed, failed);
     return failed > 0 ? 1 : 0;

@@ -51,174 +51,29 @@ GateResult check_syntax_stage(const EditProposal& p) {
 }
 
 GateResult check_symbols_stage(const EditProposal& p, const Context& ctx) {
-    if (!ctx.graph.index || !ctx.graph.lookup) return pass(Stage::symbols);
-    /* Compare before vs after symbol sets. A removed definition that is
-     * still referenced in the workspace is an error. */
-    auto extract_syms = [&](std::string_view content,
-                            std::vector<std::string>& defs) {
-        /* Lightweight pass: collect top-level definitions (func/class/struct
-         * at indentation 0) and all identifier references. This is the
-         * regex-fallback heuristic -- good enough for the mechanical-error
-         * net; tree-sitter will improve precision when enabled. */
-        std::vector<std::string> lines;
-        std::string_view rest = content;
-        while (!rest.empty()) {
-            auto nl = rest.find('\n');
-            if (nl == std::string_view::npos) {
-                lines.emplace_back(rest);
-                break;
-            }
-            lines.emplace_back(rest.substr(0, nl));
-            rest.remove_prefix(nl + 1);
-        }
-        for (const std::string& line : lines) {
-            /* Skip indented lines (not definitions). */
-            if (!line.empty() && (line[0] == ' ' || line[0] == '\t')) continue;
-            /* Skip blank/comment lines. */
-            std::string_view sv = line;
-            while (!sv.empty() && sv[0] == ' ') sv.remove_prefix(1);
-            if (sv.empty() || sv[0] == '/' || sv[0] == '#' || sv[0] == '*')
-                continue;
-            /* Collect the first identifier as a definition candidate. */
-            size_t i = 0;
-            while (i < sv.size() && (std::isalpha(sv[i]) || sv[i] == '_' ||
-                                     (i > 0 && std::isdigit(sv[i]))))
-                ++i;
-            if (i > 2) {
-                std::string name(sv.substr(0, i));
-                /* Reject if it looks like a keyword. */
-                static const char* kws[] = {
-                    "if",   "else",  "for",   "while", "switch", "case",
-                    "return", "break", "continue", "goto", "do",
-                    "struct", "class", "enum",  "union", "typedef",
-                    "namespace", "using", "import", "package", "func",
-                    "type",  "var",   "const", "fn",    "pub",    "mod",
-                };
-                bool kw = false;
-                for (const char* k : kws)
-                    if (name == k) { kw = true; break; }
-                if (!kw) defs.push_back(std::move(name));
-            }
-        }
-    };
-
-    std::vector<std::string> before_defs, after_defs;
-    extract_syms(p.before_content, before_defs);
-    extract_syms(p.after_content, after_defs);
-
-    /* Find removed defs: in before but not in after. */
-    std::vector<std::string> removed;
-    for (const auto& bd : before_defs) {
-        bool found = false;
-        for (const auto& ad : after_defs)
-            if (ad == bd) { found = true; break; }
-        if (!found) removed.push_back(bd);
+    auto issues = check_symbols(p, ctx.graph);
+    if (issues.empty()) return pass(Stage::symbols);
+    const auto& worst = issues[0];
+    std::string kind_str;
+    switch (worst.kind) {
+        case SymbolIssue::Kind::undefined_ref: kind_str = "undefined reference"; break;
+        case SymbolIssue::Kind::removed_def:   kind_str = "removed definition still referenced"; break;
+        case SymbolIssue::Kind::wrong_arity:   kind_str = "wrong arity"; break;
     }
-    if (removed.empty()) return pass(Stage::symbols);
-
-    /* Check if any removed def is still referenced in the workspace. */
-    for (const auto& name : removed) {
-        std::int32_t id = 0;
-        std::string nm, fl;
-        std::uint32_t ln = 0;
-        if (ctx.graph.lookup(ctx.graph.index, name, p.path, id, nm, fl, ln)
-                .ok() && id != 0) {
-            /* Symbol is defined elsewhere -- removing it here is fine
-             * as long as it's not the only definition. Check callers. */
-            std::vector<std::int32_t> callers;
-            ctx.graph.callers_of(ctx.graph.index, id, callers);
-            if (!callers.empty()) {
-                return fail(Stage::symbols,
-                    core::make_error_code(core::Err::e_verify_fail),
-                    "removed definition '" + name +
-                    "' is still referenced by " + std::to_string(callers.size()) +
-                    " caller(s) in the workspace",
-                    p.path);
-            }
-        } else {
-            /* Symbol not found in the index at all after the edit -- if it
-             * was referenced before, the references are now broken. */
-            std::vector<std::int32_t> callers;
-            ctx.graph.lookup(ctx.graph.index, name, "", id, nm, fl, ln);
-            if (id != 0) {
-                ctx.graph.callers_of(ctx.graph.index, id, callers);
-                if (!callers.empty()) {
-                    return fail(Stage::symbols,
-                        core::make_error_code(core::Err::e_verify_fail),
-                        "removed definition '" + name +
-                        "' has no remaining definition but is referenced",
-                        p.path);
-                }
-            }
-        }
-    }
-    return pass(Stage::symbols);
+    return fail(Stage::symbols,
+                core::make_error_code(core::Err::e_verify_fail),
+                kind_str + " '" + worst.name + "'",
+                worst.file.empty() ? p.path : worst.file, worst.line);
 }
 
 GateResult check_impact_stage(const EditProposal& p, const Context& ctx) {
-    if (!ctx.graph.index || !ctx.graph.lookup || !ctx.graph.callers_of)
-        return pass(Stage::impact);
-    /* Find symbols changed in this edit (defs that differ between before/after).
-     * For each, check if callers' files have syntax issues after the edit. */
-    auto defs_of = [](std::string_view content) {
-        std::vector<std::string> result;
-        std::string_view rest = content;
-        while (!rest.empty()) {
-            auto nl = rest.find('\n');
-            std::string_view line =
-                (nl == std::string_view::npos) ? rest : rest.substr(0, nl);
-            if (!line.empty() && line[0] != ' ' && line[0] != '\t' &&
-                line[0] != '/' && line[0] != '#') {
-                size_t i = 0;
-                while (i < line.size() && (std::isalpha(line[i]) ||
-                                           line[i] == '_' ||
-                                           (i > 0 && std::isdigit(line[i]))))
-                    ++i;
-                if (i > 2) result.emplace_back(line.substr(0, i));
-            }
-            if (nl == std::string_view::npos) break;
-            rest.remove_prefix(nl + 1);
-        }
-        return result;
-    };
-
-    auto before = defs_of(p.before_content);
-    auto after = defs_of(p.after_content);
-
-    for (const auto& name : before) {
-        bool still_there = false;
-        for (const auto& a : after)
-            if (a == name) { still_there = true; break; }
-        if (still_there) continue;
-
-        /* This definition was removed. Check if callers exist. */
-        std::int32_t id = 0;
-        std::string nm, fl;
-        std::uint32_t ln = 0;
-        ctx.graph.lookup(ctx.graph.index, name, p.path, id, nm, fl, ln);
-        if (id == 0) continue;
-        std::vector<std::int32_t> callers;
-        ctx.graph.callers_of(ctx.graph.index, id, callers);
-        for (int32_t cid : callers) {
-            (void)cid;
-            /* We can report the caller but can't re-parse their file here
-             * (that would require reading the file). Report the impact. */
-            std::string caller_name;
-            std::string caller_file;
-            std::uint32_t caller_line = 0;
-            std::int32_t dummy = 0;
-            ctx.graph.lookup(ctx.graph.index, "", "", dummy, caller_name,
-                             caller_file, caller_line);
-            if (!caller_file.empty()) {
-                return fail(Stage::impact,
-                    core::make_error_code(core::Err::e_verify_fail),
-                    "change removes '" + name + "' which is called by " +
-                    caller_file,
-                    p.path);
-            }
-        }
-    }
-    return pass(Stage::impact);
+    auto issues = check_impact(p, ctx.graph);
+    if (issues.empty()) return pass(Stage::impact);
+    const auto& worst = issues[0];
+    return fail(Stage::impact,
+                core::make_error_code(core::Err::e_verify_fail),
+                worst.detail,
+                p.path);
 }
 
 GateResult check_diff_stage(const EditProposal& p) {

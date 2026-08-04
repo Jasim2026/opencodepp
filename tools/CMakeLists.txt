@@ -14,10 +14,6 @@ add_executable(probe probe.cpp)
 target_link_libraries(probe PRIVATE opencodepp_static)
 add_test(NAME probe_mock COMMAND probe --mock)
 
-# run_agent needs the prompt templates, so it runs from the repo root.
-set_tests_properties(run_agent_mock PROPERTIES
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
-
 add_executable(bench_prompt bench_prompt.cpp)
 target_link_libraries(bench_prompt PRIVATE opencodepp_static)
 
@@ -27,3 +23,7 @@ target_link_libraries(bench_graph PRIVATE opencodepp_static)
 add_executable(run_agent run_agent.cpp)
 target_link_libraries(run_agent PRIVATE opencodepp_static)
 add_test(NAME run_agent_mock COMMAND run_agent --mock)
+
+# run_agent needs the prompt templates, so it runs from the repo root.
+set_tests_properties(run_agent_mock PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")

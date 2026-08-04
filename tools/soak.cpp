@@ -142,8 +142,7 @@ int main(int argc, char** argv) {
     int graceful_errors = 0;
     int aborts = 0;
     int hangs = 0;
-    long rss_min = -1;
-    long rss_max = -1;
+    std::vector<long> rss_ends; /* steady-state RSS of each completed task */
     const long t0 = ::time(nullptr);
 
     std::printf("soak: bin=%s tasks=%d timeout=%ds fault_every=%d\n",
@@ -168,16 +167,14 @@ int main(int argc, char** argv) {
         /* watchdog loop: poll the child, sample RSS, honor the timeout. */
         bool hung = false;
         int status = 0;
+        long rss_last = -1;
         const long deadline = ::time(nullptr) + a.task_timeout_s;
         for (;;) {
             const pid_t w = ::waitpid(pid, &status, WNOHANG);
             if (w == pid) break;
             if (w < 0) break; /* ECHILD: already reaped elsewhere */
             const long rss = child_rss_kb(pid);
-            if (rss > 0) {
-                if (rss_min < 0 || rss < rss_min) rss_min = rss;
-                if (rss_max < 0 || rss > rss_max) rss_max = rss;
-            }
+            if (rss > 0) rss_last = rss; /* keep the newest steady-state sample */
             if (::time(nullptr) >= deadline) {
                 ::kill(pid, SIGKILL);
                 ::waitpid(pid, nullptr, 0);
@@ -215,9 +212,18 @@ int main(int argc, char** argv) {
             ++aborts;
             std::fprintf(stderr, "  task %2d: ABORT (unknown exit)\n", task + 1);
         }
+        if (rss_last > 0) rss_ends.push_back(rss_last);
     }
 
     const long elapsed = ::time(nullptr) - t0;
+    /* Each task is a fresh process, so its end-of-task RSS is a steady-state
+     * footprint sample; growth across tasks signals a leaking per-task
+     * footprint (e.g. workspace accumulation), not intra-run ASan warmup. */
+    long rss_min = -1, rss_max = -1;
+    for (const long v : rss_ends) {
+        if (rss_min < 0 || v < rss_min) rss_min = v;
+        if (rss_max < 0 || v > rss_max) rss_max = v;
+    }
     const long rss_growth = (rss_min >= 0 && rss_max >= 0)
                                 ? (rss_max - rss_min)
                                 : -1;

@@ -221,6 +221,46 @@ production code as TODO stubs. Checkpoint reports reference this file by section
     triggers `-Wmissing-field-initializers` because `line`, `col`, and `file`
     are omitted. Fix: provide all fields explicitly.
 
+## Phase 10 lessons
+
+- **A user-declared `~T` suppresses the implicit move ctor (revisited for
+  `FakeServer`)**: the test server struct had a `stop` `shared_ptr`, a move
+  ctor that moved it, and a destructor that called `stop->store(true)` — the
+  *moved-from* object's `stop` was null, so the moved-from destructor
+  segfaulted on return-from-factory. Symptom: crash right after
+  `start_server` returned, before any scenario printed. Fix: guard the
+  destructor with `if (stop)`. Any RAII wrapper with a moved-from-able member
+  must null-check before use in `~T`.
+- **`{"error":{...}}` frames are not handled by every adapter**: `openai.cpp`
+  ignored error frames (no `choices`), so a 200-with-error body looked like an
+  empty successful turn. The anthropic adapter already mapped them; the openai
+  adapter now mirrors it (`e_auth`/`e_rate_limit`/`e_provider_err`). When
+  adding a provider adapter, error frames must be first-class.
+- **Provider-level errors must be checked even when the transport closed
+  cleanly**: `one_round` broke out of the retry loop on `ec.ok()` before
+  inspecting `provider_err`, so clean-200 errors returned success. Structure:
+  on `ec.ok()`, return `provider_err` if set, else `break`.
+- **SSE usage accounting depends on frame order**: the fake server emitted
+  `usage` in a separate frame *after* the `finish_reason` frame, so
+  `MessageDone` fired with zero usage (the adapter emits done as soon as
+  finish is known). Put `usage` in the same frame as `finish_reason`, or
+  accept `tokens_used() == 0` in the test.
+- **A fake server must outlive the client code that uses it**: `run_agent`
+  built its `--mock` server in one scope then called `run()` after the scope,
+  so the server thread was joined (port closed) before any connect →
+  `e_net_connect`. Keep the server alive for the entire drive (same block, or
+  pass it in).
+- **`set_tests_properties` for a CTest must come AFTER its `add_test`**:
+  referencing an as-yet-undeclared test is a hard configure-time CMake error
+  on every CI job (the local light-compile pass never notices). Verify CMake
+  wiring with a cheap `cmake -S . -B /tmp/...` configure before pushing.
+- **`agent::to_string(state)` returns `string_view`, not `const char*`** —
+  `printf("%s", ...)` is `-Werror=format`. Use `%.*s` with size/data.
+- **`fprintf`/`fflush` probes are the local debugger** (no gdb, no ASan in
+  proot, `ulimit -c` disabled): isolate a startup segfault by printing
+  between each construction step, then minimize to a standalone fixture
+  (see `srv_dbg.cpp` pattern).
+
 ---
 
 <!-- appends only; do not rewrite history -->

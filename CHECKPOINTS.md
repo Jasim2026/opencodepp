@@ -20,7 +20,7 @@ a phase may not be closed on any target regression.
 | 07 Code graph | `13_PHASE_07.md` | **done** | `reports/07.md` | symbol index, call graph, snippets; CI 8/8 (run 30850083191); 1k files ~0.2s compute / 11.7MB RSS |
 | 08 Tools | `14_PHASE_08.md` | **done** | `reports/08.md` | 24 local suites; CI 8/8 (runs 30881000945, 30880646109, 30878884892); patch-interleave bug, split_lines trailing fix, hidden Unicode |
 | 09 Verification | `15_PHASE_09.md` | **done** | `reports/09.md` | gates + golden suite (T3); CI 8/8 (run 30886416695) |
-| 10 Agent loop | `16_PHASE_10.md` | open | `reports/10.md` | states, intent, loop, feedback |
+| 10 Agent loop | `16_PHASE_10.md` | **done** | `reports/10.md` | states, session, intent, loop, feedback, e2e scenarios, run_agent CLI; CI 8/8 (runs 30889823117, 30903600328, 30903963276, 30904639979); fault-injection suite deferred to P13 |
 | 11 Memory | `17_PHASE_11.md` | open | `reports/11.md` | session resume, workspace memory |
 | 12 ABI/bindings | `18_PHASE_12.md` | open | `reports/12.md` | C ABI v1, CLI, python, jni |
 | 13 Optimization/hardening | `19_PHASE_13.md` | open | `reports/13.md` | T2, fuzz, soak, measure |

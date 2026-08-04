@@ -29,7 +29,8 @@ foreach(test
     tools_test
     permission_test
     shell_test
-    verify_test)
+    verify_test
+    verify_golden_test)
   add_executable(${test} ${test}.cpp)
   target_link_libraries(${test} PRIVATE opencodepp_static)
   add_test(NAME ${test} COMMAND ${test})
@@ -71,6 +72,10 @@ set_tests_properties(shell_test PROPERTIES
 
 # verify_test runs from the repo root (reads golden fixtures in later commits).
 set_tests_properties(verify_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+# verify_golden_test runs from the repo root.
+set_tests_properties(verify_golden_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # store_test runs the sqlite suite only when the optional backend is built.

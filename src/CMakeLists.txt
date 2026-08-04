@@ -8,11 +8,13 @@
 # opencodepp_shared : shared lib (dlopen-friendly; carries exported ABI symbol).
 
 set(OPENCODE_CORE_SOURCES
+  abi/opencode_api.cpp
   abi/version.cpp
   agent/feedback.cpp
   agent/intent.cpp
   agent/loop.cpp
   agent/session.cpp
+  app.cpp
   config/config.cpp
   config/env_snapshot.cpp
   core/arena.cpp

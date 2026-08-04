@@ -65,6 +65,14 @@ set_tests_properties(graph_test PROPERTIES
 set_tests_properties(tools_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
+# abi_test.c is a pure C11 program that links only the C ABI (opencodepp_shared)
+# and needs the prompt templates + workspace from the repo root.
+add_executable(abi_test abi_test.c)
+target_link_libraries(abi_test PRIVATE opencodepp_shared)
+add_test(NAME abi_test COMMAND abi_test)
+set_tests_properties(abi_test PROPERTIES
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
 # permission_test runs from the repo root (same sandbox convention as tools_test).
 set_tests_properties(permission_test PROPERTIES
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
